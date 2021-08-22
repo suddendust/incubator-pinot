@@ -37,6 +37,7 @@ import org.apache.pinot.common.proto.Server;
 import org.apache.pinot.common.request.context.ExpressionContext;
 import org.apache.pinot.common.request.context.FilterContext;
 import org.apache.pinot.common.request.context.FunctionContext;
+import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.DataTable;
 import org.apache.pinot.common.utils.DataTable.MetadataKey;
 import org.apache.pinot.core.common.datatable.DataTableBuilder;
@@ -167,10 +168,7 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
     // TODO: Change broker to watch both IdealState and ExternalView to not query the removed segments
     int numSegmentsQueried = segmentsToQuery.size();
     int numSegmentsAcquired = segmentDataManagers.size();
-    if (numSegmentsQueried > numSegmentsAcquired) {
-      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
-          numSegmentsQueried - numSegmentsAcquired);
-    }
+
     List<IndexSegment> indexSegments = new ArrayList<>(numSegmentsAcquired);
     for (SegmentDataManager segmentDataManager : segmentDataManagers) {
       indexSegments.add(segmentDataManager.getSegment());
@@ -249,6 +247,14 @@ public class ServerQueryExecutorV1Impl implements QueryExecutor {
           .put(MetadataKey.NUM_CONSUMING_SEGMENTS_PROCESSED.getName(), Integer.toString(numConsumingSegmentsProcessed));
       dataTable.getMetadata()
           .put(MetadataKey.MIN_CONSUMING_FRESHNESS_TIME_MS.getName(), Long.toString(minConsumingFreshnessTimeMs));
+    }
+
+    if (numSegmentsQueried > numSegmentsAcquired) {
+      String errorMessage =
+          String.format("Some segments could not be acquired: %d", numSegmentsQueried - numSegmentsAcquired);
+      dataTable.addException(QueryException.getException(QueryException.SEGMENTS_UNACQUIRED_ERROR, errorMessage));
+      _serverMetrics.addMeteredTableValue(tableNameWithType, ServerMeter.NUM_MISSING_SEGMENTS,
+          numSegmentsQueried - numSegmentsAcquired);
     }
 
     LOGGER.debug("Query processing time for request Id - {}: {}", requestId, queryProcessingTime);

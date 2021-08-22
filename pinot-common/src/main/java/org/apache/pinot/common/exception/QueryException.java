@@ -63,6 +63,9 @@ public class QueryException {
   public static final int COMBINE_GROUP_BY_EXCEPTION_ERROR_CODE = 600;
   public static final int QUERY_VALIDATION_ERROR_CODE = 700;
   public static final int UNKNOWN_ERROR_CODE = 1000;
+  public static final int SEGMENTS_NOT_ONLINE_ERROR_CODE = 1001;
+  public static final int SEGMENTS_UNACQUIRED_ERROR_CODE = 1002;
+  public static final int SERVERS_NOT_RESPONDED_ERROR_CODE = 1003;
   // NOTE: update isClientError() method appropriately when new codes are added
 
   public static final ProcessingException JSON_PARSING_ERROR = new ProcessingException(JSON_PARSING_ERROR_CODE);
@@ -104,7 +107,7 @@ public class QueryException {
   public static final ProcessingException QUERY_VALIDATION_ERROR = new ProcessingException(QUERY_VALIDATION_ERROR_CODE);
   public static final ProcessingException UNKNOWN_ERROR = new ProcessingException(UNKNOWN_ERROR_CODE);
   public static final ProcessingException QUOTA_EXCEEDED_ERROR = new ProcessingException(TOO_MANY_REQUESTS_ERROR_CODE);
-
+  public static final ProcessingException SEGMENTS_UNACQUIRED_ERROR = new ProcessingException(SEGMENTS_UNACQUIRED_ERROR_CODE);
   static {
     JSON_PARSING_ERROR.setMessage("JsonParsingError");
     JSON_COMPILATION_ERROR.setMessage("JsonCompilationError");
