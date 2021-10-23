@@ -31,6 +31,7 @@ import java.util.TreeMap;
 import org.apache.helix.controller.rebalancer.strategy.AutoRebalanceStrategy;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierSegmentSelector;
 import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateModel;
 import org.apache.pinot.spi.utils.Pairs;
 
@@ -360,7 +361,7 @@ public class SegmentAssignmentUtils {
         if (instanceStateMap.containsValue(SegmentStateModel.ONLINE)) {
           // find an eligible tier for the segment, from the ordered list of tiers
           for (Tier tier : sortedTiers) {
-            if (tier.getSegmentSelector().selectSegment(tableNameWithType, segmentName)) {
+            if (isEligibleForTier(tableNameWithType, segmentName, tier)) {
               _tierNameToSegmentAssignmentMap.get(tier.getName()).put(segmentName, instanceStateMap);
               selected = true;
               break;
@@ -376,6 +377,19 @@ public class SegmentAssignmentUtils {
 
       // remove tiers with no eligible segments
       _tierNameToSegmentAssignmentMap.entrySet().removeIf(e -> e.getValue().isEmpty());
+    }
+
+    private boolean isEligibleForTier(String tableNameWithType, String segmentName, Tier tier) {
+      //all selectors for a tier should satisfy
+      List<TierSegmentSelector> segmentSelectors = tier.getSegmentSelector();
+      boolean isEligible = true;
+      for (TierSegmentSelector segmentSelector : segmentSelectors) {
+        if (!segmentSelector.selectSegment(tableNameWithType, segmentName)) {
+          isEligible = false;
+          break;
+        }
+      }
+      return isEligible;
     }
 
     /**

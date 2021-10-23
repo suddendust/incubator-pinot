@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.common.tier;
 
+import com.google.common.collect.ImmutableList;
+import java.util.List;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
 
@@ -28,7 +30,9 @@ import org.apache.pinot.spi.config.table.TierConfig;
 public final class TierFactory {
 
   public static final String TIME_SEGMENT_SELECTOR_TYPE = "time";
+  public static final String METADATA_SEGMENT_SELECTOR_TYPE = "metadata";
   public static final String PINOT_SERVER_STORAGE_TYPE = "pinot_server";
+  public static final String PINOT_DEEP_STORE_STORAGE_TYPE = "deep_store";
 
   private TierFactory() {
   }
@@ -37,12 +41,15 @@ public final class TierFactory {
    * Constructs a {@link Tier} from the {@link TierConfig} in the table config
    */
   public static Tier getTier(TierConfig tierConfig, HelixManager helixManager) {
-    TierSegmentSelector segmentSelector;
+    List<TierSegmentSelector> segmentSelectors;
     TierStorage storageSelector;
 
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
     if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelector = new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge());
+      segmentSelectors = ImmutableList.of(new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()));
+    } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE)) {
+      segmentSelectors = ImmutableList.of(new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()),
+          new ZkMetadataBasedSegmentSelector(helixManager));
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);
     }
@@ -50,10 +57,12 @@ public final class TierFactory {
     String storageSelectorType = tierConfig.getStorageType();
     if (storageSelectorType.equalsIgnoreCase(TierFactory.PINOT_SERVER_STORAGE_TYPE)) {
       storageSelector = new PinotServerTierStorage(tierConfig.getServerTag());
+    } else if (storageSelectorType.equalsIgnoreCase(TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE)) {
+      storageSelector = new DeepStoreTierStorage();
     } else {
       throw new IllegalStateException("Unsupported storageType: " + storageSelectorType);
     }
 
-    return new Tier(tierConfig.getName(), segmentSelector, storageSelector);
+    return new Tier(tierConfig.getName(), segmentSelectors, storageSelector);
   }
 }

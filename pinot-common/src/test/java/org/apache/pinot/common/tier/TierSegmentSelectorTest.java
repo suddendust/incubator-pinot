@@ -113,4 +113,8 @@ public class TierSegmentSelectorTest {
     segmentSelector = new TimeBasedTierSegmentSelector(helixManager, "120h");
     Assert.assertFalse(segmentSelector.selectSegment(tableNameWithType, segmentName));
   }
+
+  public void testZKMetadataBasedSegmentSelector() {
+
+  }
 }
