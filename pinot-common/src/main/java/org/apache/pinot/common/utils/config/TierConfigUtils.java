@@ -18,10 +18,10 @@
  */
 package org.apache.pinot.common.utils.config;
 
-import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.tier.Tier;
@@ -51,11 +51,12 @@ public final class TierConfigUtils {
   /**
    * Gets sorted list of tiers for given storage type from provided list of TierConfig
    */
-  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, String storageType,
+  public static List<Tier> getSortedTiersForStorageType(List<TierConfig> tierConfigList, Set<String> storageTypes,
       HelixManager helixManager) {
     List<Tier> sortedTiers = new ArrayList<>();
     for (TierConfig tierConfig : tierConfigList) {
-      if (storageType.equalsIgnoreCase(tierConfig.getStorageType())) {
+      //todo: Ignore case while comparing as before
+      if (storageTypes.contains(tierConfig.getStorageType())) {
         sortedTiers.add(TierFactory.getTier(tierConfig, helixManager));
       }
     }
@@ -71,15 +72,13 @@ public final class TierConfigUtils {
    * TODO: As we add more types, this logic needs to be upgraded
    */
   public static Comparator<Tier> getTierComparator() {
-    return (o1, o2) -> {
-      TierSegmentSelector s1 = o1.getSegmentSelector();
-      TierSegmentSelector s2 = o2.getSegmentSelector();
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s1.getType()),
-          "Unsupported segmentSelectorType class %s", s1.getClass());
-      Preconditions.checkState(TierFactory.TIME_SEGMENT_SELECTOR_TYPE.equalsIgnoreCase(s2.getType()),
-          "Unsupported segmentSelectorType class %s", s2.getClass());
-      Long period1 = ((TimeBasedTierSegmentSelector) s1).getSegmentAgeMillis();
-      Long period2 = ((TimeBasedTierSegmentSelector) s2).getSegmentAgeMillis();
+    return (tier1, tier2) -> {
+      TimeBasedTierSegmentSelector s1 =
+          (TimeBasedTierSegmentSelector) tier1.getSegmentSelectors().get(TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
+      TimeBasedTierSegmentSelector s2 =
+          (TimeBasedTierSegmentSelector) tier2.getSegmentSelectors().get(TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
+      Long period1 = s1.getSegmentAgeMillis();
+      Long period2 = s2.getSegmentAgeMillis();
       return period2.compareTo(period1);
     };
   }

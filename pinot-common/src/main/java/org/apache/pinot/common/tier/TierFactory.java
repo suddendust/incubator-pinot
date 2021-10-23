@@ -18,8 +18,8 @@
  */
 package org.apache.pinot.common.tier;
 
-import com.google.common.collect.ImmutableList;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.spi.config.table.TierConfig;
 
@@ -41,14 +41,18 @@ public final class TierFactory {
    * Constructs a {@link Tier} from the {@link TierConfig} in the table config
    */
   public static Tier getTier(TierConfig tierConfig, HelixManager helixManager) {
-    List<TierSegmentSelector> segmentSelectors;
+    Map<String, TierSegmentSelector> segmentSelectors = new HashMap<>();
     TierStorage storageSelector;
 
     String segmentSelectorType = tierConfig.getSegmentSelectorType();
     if (segmentSelectorType.equalsIgnoreCase(TierFactory.TIME_SEGMENT_SELECTOR_TYPE)) {
-      segmentSelectors = ImmutableList.of(new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()));
+      segmentSelectors.put(TierFactory.TIME_SEGMENT_SELECTOR_TYPE,
+          new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()));
     } else if (segmentSelectorType.equalsIgnoreCase(TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE)) {
-      segmentSelectors = ImmutableList.of(new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()),
+      //PINOT_DEEP_STORE_STORAGE_TYPE has two selectors
+      segmentSelectors.put(TierFactory.TIME_SEGMENT_SELECTOR_TYPE,
+          new TimeBasedTierSegmentSelector(helixManager, tierConfig.getSegmentAge()));
+      segmentSelectors.put(TierFactory.METADATA_SEGMENT_SELECTOR_TYPE,
           new ZkMetadataBasedSegmentSelector(helixManager));
     } else {
       throw new IllegalStateException("Unsupported segmentSelectorType: " + segmentSelectorType);

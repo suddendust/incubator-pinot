@@ -80,9 +80,9 @@ public class TierConfigUtilsTest {
             "tier1_tag_OFFLINE");
     Tier tier = TierFactory.getTier(tierConfig, null);
     Assert.assertEquals(tier.getName(), "tier1");
-    Assert.assertTrue(tier.getSegmentSelector() instanceof TimeBasedTierSegmentSelector);
-    Assert.assertEquals(tier.getSegmentSelector().getType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
-    Assert.assertEquals(((TimeBasedTierSegmentSelector) tier.getSegmentSelector()).getSegmentAgeMillis(),
+    Assert.assertTrue(tier.getSegmentSelectors() instanceof TimeBasedTierSegmentSelector);
+    Assert.assertEquals(tier.getSegmentSelectors().getType(), TierFactory.TIME_SEGMENT_SELECTOR_TYPE);
+    Assert.assertEquals(((TimeBasedTierSegmentSelector) tier.getSegmentSelectors()).getSegmentAgeMillis(),
         30 * 24 * 60 * 60 * 1000L);
     Assert.assertTrue(tier.getStorage() instanceof PinotServerTierStorage);
     Assert.assertEquals(tier.getStorage().getType(), TierFactory.PINOT_SERVER_STORAGE_TYPE);

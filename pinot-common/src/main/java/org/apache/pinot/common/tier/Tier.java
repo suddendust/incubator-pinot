@@ -18,7 +18,7 @@
  */
 package org.apache.pinot.common.tier;
 
-import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -30,13 +30,13 @@ import java.util.List;
 public class Tier {
 
   private final String _name;
-  //a tier can have multiple selectors determining its eligibility
-  private final List<TierSegmentSelector> _segmentSelector;
+  //key -> selector type, value -> actual selector
+  private final Map<String, TierSegmentSelector> _segmentSelectors;
   private final TierStorage _storage;
 
-  public Tier(String name, List<TierSegmentSelector> segmentSelector, TierStorage storage) {
+  public Tier(String name, Map<String, TierSegmentSelector> segmentSelectors, TierStorage storage) {
     _name = name;
-    _segmentSelector = segmentSelector;
+    _segmentSelectors = segmentSelectors;
     _storage = storage;
   }
 
@@ -44,8 +44,8 @@ public class Tier {
     return _name;
   }
 
-  public List<TierSegmentSelector> getSegmentSelector() {
-    return _segmentSelector;
+  public Map<String, TierSegmentSelector> getSegmentSelectors() {
+    return _segmentSelectors;
   }
 
   public TierStorage getStorage() {

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.rebalance;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -195,7 +196,8 @@ public class TableRebalancer {
       // get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
       // Other types should be treated differently
       sortedTiers = TierConfigUtils.getSortedTiersForStorageType(tableConfig.getTierConfigsList(),
-          TierFactory.PINOT_SERVER_STORAGE_TYPE, _helixManager);
+          ImmutableSet.of(TierFactory.PINOT_SERVER_STORAGE_TYPE, TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE),
+          _helixManager);
 
       tierToInstancePartitionMap = new HashMap<>();
       for (Tier tier : sortedTiers) {

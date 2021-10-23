@@ -25,6 +25,7 @@ import org.apache.helix.messaging.handling.MessageHandler;
 import org.apache.helix.messaging.handling.MessageHandlerFactory;
 import org.apache.helix.model.Message;
 import org.apache.pinot.common.Utils;
+import org.apache.pinot.common.messages.SegmentDeleteMessage;
 import org.apache.pinot.common.messages.SegmentRefreshMessage;
 import org.apache.pinot.common.messages.SegmentReloadMessage;
 import org.apache.pinot.common.metrics.ServerMeter;
@@ -83,6 +84,9 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         return new SegmentRefreshMessageHandler(new SegmentRefreshMessage(message), _metrics, context);
       case SegmentReloadMessage.RELOAD_SEGMENT_MSG_SUB_TYPE:
         return new SegmentReloadMessageHandler(new SegmentReloadMessage(message), _metrics, context);
+      case SegmentDeleteMessage
+          .DELETE_SEGMENT_MSG_SUB_TYPE:
+        return new SegmentDeleteMessageHandler(new SegmentDeleteMessage(message), _metrics, context);
       default:
         LOGGER.warn("Unsupported user defined message sub type: {} for segment: {}", msgSubType,
             message.getPartitionName());
@@ -152,6 +156,34 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
           acquireSema(_segmentName, _logger);
           _instanceDataManager.reloadSegment(_tableNameWithType, _segmentName, _forceDownload);
         }
+        helixTaskResult.setSuccess(true);
+      } catch (Throwable e) {
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.RELOAD_FAILURES, 1);
+        // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
+        // (without any corresponding logs to indicate failure!) in the callable path
+        throw new RuntimeException(
+            "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
+      } finally {
+        releaseSema();
+      }
+      return helixTaskResult;
+    }
+  }
+
+  private class SegmentDeleteMessageHandler extends DefaultMessageHandler {
+
+    SegmentDeleteMessageHandler(SegmentDeleteMessage segmentDeleteMessage, ServerMetrics metrics,
+        NotificationContext context) {
+      super(segmentDeleteMessage, metrics, context);
+    }
+
+    @Override
+    public HelixTaskResult handleMessage()
+        throws InterruptedException {
+      HelixTaskResult helixTaskResult = new HelixTaskResult();
+      _logger.info("Handling message: {}", _message);
+      try {
+        //todo: implement segment deletion
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
         _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.RELOAD_FAILURES, 1);
