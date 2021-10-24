@@ -32,6 +32,7 @@ import org.apache.commons.configuration.Configuration;
 import org.apache.helix.HelixManager;
 import org.apache.pinot.common.assignment.InstancePartitions;
 import org.apache.pinot.common.tier.Tier;
+import org.apache.pinot.common.tier.TierFactory;
 import org.apache.pinot.common.utils.SegmentUtils;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceConfigConstants;
 import org.apache.pinot.spi.config.table.ReplicaGroupStrategyConfig;
@@ -214,7 +215,10 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
       for (Map.Entry<String, Map<String, Map<String, String>>> entry : tierNameToSegmentAssignmentMap.entrySet()) {
         String tierName = entry.getKey();
         Map<String, Map<String, String>> tierCurrentAssignment = entry.getValue();
+        //for all segments that are eligible for DEEP_STORE
+        if(tierName.equals(TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE)) {
 
+        }
         InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tierName);
         Preconditions
             .checkNotNull(tierInstancePartitions, "Failed to find instance partitions for tier: %s of table: %s",

@@ -381,7 +381,7 @@ public class SegmentAssignmentUtils {
 
     private boolean isEligibleForTier(String tableNameWithType, String segmentName, Tier tier) {
       //all selectors for a tier should satisfy
-      List<TierSegmentSelector> segmentSelectors = tier.getSegmentSelectors();
+      Collection<TierSegmentSelector> segmentSelectors = tier.getSegmentSelectors().values();
       boolean isEligible = true;
       for (TierSegmentSelector segmentSelector : segmentSelectors) {
         if (!segmentSelector.selectSegment(tableNameWithType, segmentName)) {
