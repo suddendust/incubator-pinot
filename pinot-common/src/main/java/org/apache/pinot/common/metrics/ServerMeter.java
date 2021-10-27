@@ -60,6 +60,7 @@ public enum ServerMeter implements AbstractMetrics.Meter {
   NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
   NUM_MISSING_SEGMENTS("segments", false),
   RELOAD_FAILURES("segments", false),
+  FREEZE_FAILURES("segments", false),
   REFRESH_FAILURES("segments", false),
   UNTAR_FAILURES("segments", false),
   SEGMENT_DOWNLOAD_FAILURES("segments", false),

@@ -20,6 +20,7 @@ package org.apache.pinot.controller.helix.core.assignment.segment;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -217,7 +218,12 @@ public class RealtimeSegmentAssignment implements SegmentAssignment {
         Map<String, Map<String, String>> tierCurrentAssignment = entry.getValue();
         //for all segments that are eligible for DEEP_STORE
         if(tierName.equals(TierFactory.PINOT_DEEP_STORE_STORAGE_TYPE)) {
-
+          tierCurrentAssignment.entrySet()
+              .forEach(e -> {
+                String segmentName = e.getKey();
+                Collection<String> instances = e.getValue().values();
+                //send SegmentDeleteMessage to each instance for this segment
+              });
         }
         InstancePartitions tierInstancePartitions = tierInstancePartitionsMap.get(tierName);
         Preconditions

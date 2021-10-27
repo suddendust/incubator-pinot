@@ -158,7 +158,7 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
         }
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
-        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.RELOAD_FAILURES, 1);
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.FREEZE_FAILURES, 1);
         // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
         // (without any corresponding logs to indicate failure!) in the callable path
         throw new RuntimeException(
@@ -184,13 +184,14 @@ public class SegmentMessageHandlerFactory implements MessageHandlerFactory {
       _logger.info("Handling message: {}", _message);
       try {
         //todo: implement segment deletion
+        _instanceDataManager.removeSegment();
         helixTaskResult.setSuccess(true);
       } catch (Throwable e) {
-        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.RELOAD_FAILURES, 1);
+        _metrics.addMeteredTableValue(_tableNameWithType, ServerMeter.FREEZE_FAILURES, 1);
         // catch all Errors and Exceptions: if we only catch Exception, Errors go completely unhandled
         // (without any corresponding logs to indicate failure!) in the callable path
         throw new RuntimeException(
-            "Caught exception while reloading segment: " + _segmentName + " in table: " + _tableNameWithType, e);
+            "Caught exception while freezing segment: " + _segmentName + " in table: " + _tableNameWithType, e);
       } finally {
         releaseSema();
       }
