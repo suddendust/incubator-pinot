@@ -100,7 +100,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     String testColumnName = "column1";
     long columnValue = 999999999L;
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(null, null);
+    avroRecordExtractor.init(null, true, null);
 
     org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
         .addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();

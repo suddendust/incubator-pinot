@@ -60,6 +60,7 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _extractRecordAsJsonBlob = false;
 
   public static BigDecimal binaryToDecimal(Binary value, int precision, int scale) {
     /*
@@ -90,7 +91,9 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
   }
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, boolean extractRecordAsJsonBlob,
+      RecordExtractorConfig recordExtractorConfig) {
+    _extractRecordAsJsonBlob = extractRecordAsJsonBlob;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
@@ -101,6 +104,8 @@ public class ParquetNativeRecordExtractor extends BaseRecordExtractor<Group> {
 
   @Override
   public GenericRow extract(Group from, GenericRow to) {
+    if (_extractRecordAsJsonBlob) {
+    }
     GroupType fromType = from.getType();
     if (_extractAll) {
       List<Type> fields = fromType.getFields();

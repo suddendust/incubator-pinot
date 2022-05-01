@@ -56,17 +56,6 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
   @Override
   public GenericRow extract(CSVRecord from, GenericRow to) {
     if (_extractRecordAsJsonBlob) {
-      CsvSchema csvSchema = CsvSchema.emptySchema().withHeader();
-      CsvMapper csvMapper = new CsvMapper();
-      MappingIterator<Map<?, ?>> mappingIterator = csvMapper.reader()
-          .forType(Map.class)
-          .with(csvSchema)
-          .readValues(from.toString());
-      List<Map<?, ?>> list = mappingIterator.readAll();
-
-      ObjectMapper objectMapper = new ObjectMapper();
-      String jsonPretty = objectMapper.writerWithDefaultPrettyPrinter()
-          .writeValueAsString(list);
     }
     for (String fieldName : _fields) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;

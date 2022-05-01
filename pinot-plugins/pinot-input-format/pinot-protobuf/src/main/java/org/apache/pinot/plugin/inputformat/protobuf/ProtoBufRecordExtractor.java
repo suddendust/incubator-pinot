@@ -21,7 +21,9 @@ package org.apache.pinot.plugin.inputformat.protobuf;
 import com.google.common.collect.ImmutableSet;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Descriptors;
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.Message;
+import com.google.protobuf.util.JsonFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -42,9 +44,12 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _extractRecordAsJsonBlob = false;
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, boolean extractRecordAsJsonBlob,
+      RecordExtractorConfig recordExtractorConfig) {
+    _extractRecordAsJsonBlob = extractRecordAsJsonBlob;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
@@ -55,6 +60,13 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
 
   @Override
   public GenericRow extract(Message from, GenericRow to) {
+    if (_extractRecordAsJsonBlob) {
+      try {
+        to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, JsonFormat.printer().print(from));
+      } catch (InvalidProtocolBufferException e) {
+        throw new RuntimeException("Error converting Protobuf record to JSON string", e);
+      }
+    }
     Descriptors.Descriptor descriptor = from.getDescriptorForType();
     if (_extractAll) {
       for (Descriptors.FieldDescriptor fieldDescriptor : descriptor.getFields()) {

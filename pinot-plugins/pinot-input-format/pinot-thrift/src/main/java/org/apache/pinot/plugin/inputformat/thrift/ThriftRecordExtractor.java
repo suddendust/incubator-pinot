@@ -28,8 +28,12 @@ import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 import org.apache.thrift.TBase;
+import org.apache.thrift.TException;
 import org.apache.thrift.TFieldIdEnum;
+import org.apache.thrift.TSerializer;
 import org.apache.thrift.meta_data.FieldMetaData;
+import org.apache.thrift.protocol.TSimpleJSONProtocol;
+import org.apache.thrift.transport.TTransportException;
 
 
 /**
@@ -40,9 +44,11 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
   private Map<String, Integer> _fieldIds;
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _extractRecordAsJsonBlob = false;
 
   @Override
-  public void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, boolean extractRecordAsJsonBlob,
+      RecordExtractorConfig recordExtractorConfig) {
     _fieldIds = ((ThriftRecordExtractorConfig) recordExtractorConfig).getFieldIds();
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
@@ -54,6 +60,15 @@ public class ThriftRecordExtractor extends BaseRecordExtractor<TBase> {
 
   @Override
   public GenericRow extract(TBase from, GenericRow to) {
+    if (_extractRecordAsJsonBlob) {
+      try {
+        TSerializer serializer = new TSerializer(new TSimpleJSONProtocol.Factory());
+        to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, serializer.toString(from));
+        return to;
+      } catch (TException e) {
+        throw new RuntimeException("Exception while converting thrift record to JSON string", e);
+      }
+    }
     if (_extractAll) {
       for (Map.Entry<String, Integer> nameToId : _fieldIds.entrySet()) {
         Object value = from.getFieldValue(from.fieldForId(nameToId.getValue()));
