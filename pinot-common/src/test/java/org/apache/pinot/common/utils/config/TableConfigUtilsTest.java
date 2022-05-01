@@ -117,7 +117,8 @@ public class TableConfigUtilsTest {
 
   private class TestStreamMessageDecoder implements StreamMessageDecoder<byte[]> {
     @Override
-    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+    public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName,
+        boolean extractRecordAsJsonBlob)
         throws Exception {
     }
 

@@ -38,9 +38,12 @@ import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
 public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _extractRecordAsJsonBlob = false;
 
   @Override
-  public void init(@Nullable Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  public void init(@Nullable Set<String> fields, boolean extractRecordAsJsonBlob,
+      @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _extractRecordAsJsonBlob = extractRecordAsJsonBlob;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
@@ -51,6 +54,10 @@ public class AvroRecordExtractor extends BaseRecordExtractor<GenericRecord> {
 
   @Override
   public GenericRow extract(GenericRecord from, GenericRow to) {
+    if (_extractRecordAsJsonBlob) {
+      to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, from.toString());
+      return to;
+    }
     if (_extractAll) {
       List<Schema.Field> fields = from.getSchema().getFields();
       for (Schema.Field field : fields) {

@@ -18,7 +18,10 @@
  */
 package org.apache.pinot.plugin.inputformat.csv;
 
+import com.fasterxml.jackson.databind.MappingIterator;
+import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.google.common.collect.ImmutableSet;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.csv.CSVRecord;
@@ -26,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.pinot.spi.data.readers.BaseRecordExtractor;
 import org.apache.pinot.spi.data.readers.GenericRow;
 import org.apache.pinot.spi.data.readers.RecordExtractorConfig;
+import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 
 
 /**
@@ -35,9 +39,11 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   private Character _multiValueDelimiter = null;
   private Set<String> _fields;
+  private boolean _extractRecordAsJsonBlob = false;
 
   @Override
-  public void init(Set<String> fields, RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, boolean extractRecordAsJsonBlob, RecordExtractorConfig recordExtractorConfig) {
+    _extractRecordAsJsonBlob = extractRecordAsJsonBlob;
     CSVRecordExtractorConfig csvRecordExtractorConfig = (CSVRecordExtractorConfig) recordExtractorConfig;
     if (fields == null || fields.isEmpty()) {
       _fields = csvRecordExtractorConfig.getColumnNames();
@@ -49,6 +55,19 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   @Override
   public GenericRow extract(CSVRecord from, GenericRow to) {
+    if (_extractRecordAsJsonBlob) {
+      CsvSchema csvSchema = CsvSchema.emptySchema().withHeader();
+      CsvMapper csvMapper = new CsvMapper();
+      MappingIterator<Map<?, ?>> mappingIterator = csvMapper.reader()
+          .forType(Map.class)
+          .with(csvSchema)
+          .readValues(from.toString());
+      List<Map<?, ?>> list = mappingIterator.readAll();
+
+      ObjectMapper objectMapper = new ObjectMapper();
+      String jsonPretty = objectMapper.writerWithDefaultPrettyPrinter()
+          .writeValueAsString(list);
+    }
     for (String fieldName : _fields) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;
       to.putValue(fieldName, convert(value));

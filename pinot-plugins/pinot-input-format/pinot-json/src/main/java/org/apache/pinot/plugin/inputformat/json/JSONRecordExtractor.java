@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.plugin.inputformat.json;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Map;
@@ -35,9 +37,12 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
 
   private Set<String> _fields;
   private boolean _extractAll = false;
+  private boolean _extractEntireRecordAsJsonBlob = false;
 
   @Override
-  public void init(Set<String> fields, @Nullable RecordExtractorConfig recordExtractorConfig) {
+  public void init(Set<String> fields, boolean extractEntireRecordAsJsonBlob,
+      @Nullable RecordExtractorConfig recordExtractorConfig) {
+    _extractEntireRecordAsJsonBlob = extractEntireRecordAsJsonBlob;
     if (fields == null || fields.isEmpty()) {
       _extractAll = true;
       _fields = Collections.emptySet();
@@ -48,6 +53,14 @@ public class JSONRecordExtractor extends BaseRecordExtractor<Map<String, Object>
 
   @Override
   public GenericRow extract(Map<String, Object> from, GenericRow to) {
+    if (_extractEntireRecordAsJsonBlob) {
+      try {
+        to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, new ObjectMapper().writeValueAsString(from));
+        return to;
+      } catch (JsonProcessingException e) {
+        throw new RuntimeException("Error storing JSON record as JSON blob", e);
+      }
+    }
     if (_extractAll) {
       for (Map.Entry<String, Object> fieldToVal : from.entrySet()) {
         Object value = fieldToVal.getValue();

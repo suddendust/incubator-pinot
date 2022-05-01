@@ -45,7 +45,8 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
   private RecordExtractor<Map<String, Object>> _jsonRecordExtractor;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName,
+      boolean extractRecordAsJsonBlob)
       throws Exception {
     String recordExtractorClass = null;
     if (props != null) {
@@ -55,7 +56,7 @@ public class JSONMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = JSON_RECORD_EXTRACTOR_CLASS;
     }
     _jsonRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _jsonRecordExtractor.init(fieldsToRead, null);
+    _jsonRecordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
   }
 
   @Override

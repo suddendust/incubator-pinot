@@ -41,13 +41,18 @@ public class BatchIngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Ingestion frequency HOURLY or DAILY")
   private String _segmentIngestionFrequency;
 
+  @JsonPropertyDescription("If true, then Pinot won't parse the record for fields and will store it as a JSON string")
+  private boolean _ingestWholeRecordAsJsonBlob;
+
   @JsonCreator
   public BatchIngestionConfig(@JsonProperty("batchConfigMaps") @Nullable List<Map<String, String>> batchConfigMaps,
       @JsonProperty("segmentIngestionType") String segmentIngestionType,
-      @JsonProperty("segmentIngestionFrequency") String segmentIngestionFrequency) {
+      @JsonProperty("segmentIngestionFrequency") String segmentIngestionFrequency,
+      @JsonProperty("ingestWholeRecordAsSingleColumn") boolean ingestWholeRecordAsJsonBlob) {
     _batchConfigMaps = batchConfigMaps;
     _segmentIngestionType = segmentIngestionType;
     _segmentIngestionFrequency = segmentIngestionFrequency;
+    _ingestWholeRecordAsJsonBlob = ingestWholeRecordAsJsonBlob;
   }
 
   @Nullable
@@ -61,6 +66,10 @@ public class BatchIngestionConfig extends BaseJsonConfig {
 
   public String getSegmentIngestionFrequency() {
     return _segmentIngestionFrequency;
+  }
+
+  public boolean shouldIngestWholeRecordAsJsonBlob() {
+    return _ingestWholeRecordAsJsonBlob;
   }
 
   public void setSegmentIngestionType(String segmentIngestionType) {

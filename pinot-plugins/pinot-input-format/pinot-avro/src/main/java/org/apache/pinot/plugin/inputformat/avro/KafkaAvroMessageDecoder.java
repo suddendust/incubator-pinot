@@ -85,7 +85,8 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
   private String[] _schemaRegistryUrls;
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName,
+      boolean extractRecordAsJsonBlob)
       throws Exception {
     _schemaRegistryUrls = parseSchemaRegistryUrls(props.get(SCHEMA_REGISTRY_REST_URL));
 
@@ -115,7 +116,7 @@ public class KafkaAvroMessageDecoder implements StreamMessageDecoder<byte[]> {
       recordExtractorClass = AvroRecordExtractor.class.getName();
     }
     _avroRecordExtractor = PluginManager.get().createInstance(recordExtractorClass);
-    _avroRecordExtractor.init(fieldsToRead, null);
+    _avroRecordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
     _decoderFactory = new DecoderFactory();
     _md5ToAvroSchemaMap = new MD5AvroSchemaMap();
   }

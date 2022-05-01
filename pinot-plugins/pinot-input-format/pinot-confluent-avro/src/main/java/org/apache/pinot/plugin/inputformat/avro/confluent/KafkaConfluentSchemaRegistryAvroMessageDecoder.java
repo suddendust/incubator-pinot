@@ -84,7 +84,8 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
   }
 
   @Override
-  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  public void init(Map<String, String> props, Set<String> fieldsToRead, String topicName,
+      boolean extractRecordAsJsonBlob)
       throws Exception {
     checkState(props.containsKey(SCHEMA_REGISTRY_REST_URL), "Missing required property '%s'", SCHEMA_REGISTRY_REST_URL);
     String schemaRegistryUrl = props.get(SCHEMA_REGISTRY_REST_URL);
@@ -95,7 +96,7 @@ public class KafkaConfluentSchemaRegistryAvroMessageDecoder implements StreamMes
     Preconditions.checkNotNull(topicName, "Topic must be provided");
     _topicName = topicName;
     _avroRecordExtractor = PluginManager.get().createInstance(AvroRecordExtractor.class.getName());
-    _avroRecordExtractor.init(fieldsToRead, null);
+    _avroRecordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
   }
 
   @Override

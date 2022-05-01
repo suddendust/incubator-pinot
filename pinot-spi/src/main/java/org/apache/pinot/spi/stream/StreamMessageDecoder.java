@@ -41,10 +41,11 @@ public interface StreamMessageDecoder<T> {
    * @param props Decoder properties extracted from the {@link StreamConfig}
    * @param fieldsToRead The fields to read from the source stream. If blank, reads all fields (only for AVRO/JSON
    *                     currently)
+   * @param extractRecordAsJsonBlob true if the entire record has to be read as a JSON string without parsing
    * @param topicName Topic name of the stream
    * @throws Exception If an error occurs
    */
-  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName)
+  void init(Map<String, String> props, Set<String> fieldsToRead, String topicName, boolean extractRecordAsJsonBlob)
       throws Exception;
 
   /**

@@ -38,7 +38,7 @@ public interface RecordExtractor<T> extends Serializable {
    * @param fields List of field names to extract from the provided input record. If null or empty, extracts all fields.
    * @param recordExtractorConfig The record extractor config
    */
-  void init(@Nullable Set<String> fields, RecordExtractorConfig recordExtractorConfig);
+  void init(@Nullable Set<String> fields, boolean extraRecordAsJsonBlob, RecordExtractorConfig recordExtractorConfig);
 
   /**
    * Extracts fields as listed in the sourceFieldNames from the given input record and sets them into the GenericRow
