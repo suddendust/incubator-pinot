@@ -36,7 +36,8 @@ public class ParquetRecordReader implements RecordReader {
   private boolean _useAvroParquetRecordReader = true;
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     if (recordReaderConfig == null || ((ParquetRecordReaderConfig) recordReaderConfig).useParquetAvroRecordReader()) {
       _internalParquetRecordReader = new ParquetAvroRecordReader();
@@ -44,7 +45,7 @@ public class ParquetRecordReader implements RecordReader {
       _useAvroParquetRecordReader = false;
       _internalParquetRecordReader = new ParquetNativeRecordReader();
     }
-    _internalParquetRecordReader.init(dataFile, fieldsToRead, recordReaderConfig);
+    _internalParquetRecordReader.init(dataFile, fieldsToRead, extractRecordAsJsonBlob, recordReaderConfig);
   }
 
   @Override

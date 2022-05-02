@@ -64,11 +64,12 @@ public class JSONRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     _recordExtractor = new JSONRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
     init();
   }
 

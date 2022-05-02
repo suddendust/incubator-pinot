@@ -91,7 +91,8 @@ public class MultiplePinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig) {
   }
 
   @Override

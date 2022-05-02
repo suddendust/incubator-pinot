@@ -41,7 +41,8 @@ public interface RecordReader extends Closeable, Serializable {
    * @param recordReaderConfig Config for the reader specific to the format. e.g. delimiter for csv format etc
    * @throws IOException If an I/O error occurs
    */
-  void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException;
 
   /**

@@ -46,7 +46,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, _sourceFields, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, _sourceFields, true, csvRecordReaderConfig);
     return csvRecordReader;
   }
 

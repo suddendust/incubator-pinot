@@ -52,7 +52,8 @@ public class ThriftRecordReader implements RecordReader {
   private boolean _hasNext;
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig config)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig config)
       throws IOException {
     ThriftRecordReaderConfig recordReaderConfig = (ThriftRecordReaderConfig) config;
     _dataFile = dataFile;
@@ -73,7 +74,7 @@ public class ThriftRecordReader implements RecordReader {
     ThriftRecordExtractorConfig recordExtractorConfig = new ThriftRecordExtractorConfig();
     recordExtractorConfig.setFieldIds(_fieldIds);
     _recordExtractor = new ThriftRecordExtractor();
-    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, recordExtractorConfig);
 
     init();
   }

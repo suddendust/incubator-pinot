@@ -184,7 +184,7 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, fieldsToRead, null);
+    avroRecordReader.init(_dataFile, fieldsToRead, true, null);
     return avroRecordReader;
   }
 

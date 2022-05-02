@@ -63,14 +63,15 @@ public class ProtoBufRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     ProtoBufRecordReaderConfig protoBufRecordReaderConfig = (ProtoBufRecordReaderConfig) recordReaderConfig;
     InputStream fin = getDescriptorFileInputStream(protoBufRecordReaderConfig);
     Descriptors.Descriptor descriptor = buildProtoBufDescriptor(fin);
     _recordExtractor = new ProtoBufRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
     _dynamicMessage = DynamicMessage.getDefaultInstance(descriptor);
     init();
   }

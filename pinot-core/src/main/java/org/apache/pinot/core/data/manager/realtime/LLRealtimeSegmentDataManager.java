@@ -1318,7 +1318,8 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
 
     // Create message decoder
     Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
-    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead);
+    //fixme: Pass flag from props
+    _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead, true);
     _clientId = streamTopic + "-" + _partitionGroupId;
 
     _transformPipeline = new TransformPipeline(tableConfig, schema);

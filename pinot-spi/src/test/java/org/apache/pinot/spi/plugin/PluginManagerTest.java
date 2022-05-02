@@ -144,7 +144,7 @@ public class PluginManagerTest {
         PluginManager.get().load("test-record-reader", _jarDirFile);
 
         RecordReader testRecordReader = PluginManager.get().createInstance("test-record-reader", "TestRecordReader");
-        testRecordReader.init(null, null, null);
+        testRecordReader.init(null, null, true, null);
         int count = 0;
         while (testRecordReader.hasNext()) {
           GenericRow row = testRecordReader.next();

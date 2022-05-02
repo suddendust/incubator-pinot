@@ -77,7 +77,7 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSourceFields(), true, getThriftRecordReaderConfig());
     return recordReader;
   }
 

@@ -95,7 +95,8 @@ public class GenericRowFileRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean _extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig) {
     throw new UnsupportedOperationException();
   }
 

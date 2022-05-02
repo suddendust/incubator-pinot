@@ -54,13 +54,14 @@ public class ParquetNativeRecordReader implements RecordReader {
   private int _currentPageIdx;
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     Configuration conf = new Configuration();
     _parquetMetadata = ParquetFileReader.readFooter(conf, _dataFilePath, ParquetMetadataConverter.NO_FILTER);
     _recordExtractor = new ParquetNativeRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
     _schema = _parquetMetadata.getFileMetaData().getSchema();
     _parquetFileReader =
         new ParquetFileReader(conf, _parquetMetadata.getFileMetaData(), _dataFilePath, _parquetMetadata.getBlocks(),

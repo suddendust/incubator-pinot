@@ -56,7 +56,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, fieldsToRead, null);
+    avroRecordReader.init(_dataFile, fieldsToRead, true, null);
     return avroRecordReader;
   }
 
@@ -100,7 +100,7 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     String testColumnName = "column1";
     long columnValue = 999999999L;
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(null, true, null);
+    avroRecordExtractor.init(null, false, null);
 
     org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
         .addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();
@@ -119,5 +119,30 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
     // The data type got changed to Integer, which will then have to trigger the convert method in
     // DataTypeTransformer class.
     Assert.assertEquals("Integer", jsonMap.get(testColumnName).getClass().getSimpleName());
+  }
+
+  @Test
+  public void testRecordAsJsonString()
+      throws IOException {
+    String testColumnName = "column1";
+    long columnValue = 999999999L;
+    AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
+    avroRecordExtractor.init(null, true, null);
+
+    org.apache.pinot.spi.data.Schema pinotSchema = new org.apache.pinot.spi.data.Schema.SchemaBuilder()
+        .addSingleValueDimension(testColumnName, FieldSpec.DataType.LONG).build();
+    Schema schema = AvroUtils.getAvroSchemaFromPinotSchema(pinotSchema);
+    GenericRecord genericRecord = new GenericData.Record(schema);
+    genericRecord.put(testColumnName, columnValue);
+    GenericRow genericRow = new GenericRow();
+
+    avroRecordExtractor.extract(genericRecord, genericRow);
+    //assert there is only one column named "value"
+    Assert.assertTrue(
+        genericRow.getFieldToValueMap().size() == 1 && genericRow.getFieldToValueMap().containsKey("recordAsJson"));
+
+    Object jsonStrMaybe = genericRow.getFieldToValueMap().get("recordAsJson");
+
+
   }
 }

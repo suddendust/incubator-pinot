@@ -53,7 +53,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
     CSVRecordReader csvRecordReader = new CSVRecordReader();
-    csvRecordReader.init(_dataFile, fieldsToRead, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, fieldsToRead, true, csvRecordReaderConfig);
     return csvRecordReader;
   }
 

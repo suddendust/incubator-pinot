@@ -144,7 +144,7 @@ public class RecordReaderFactory {
       Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
       throws Exception {
     RecordReader recordReader = PluginManager.get().createInstance(recordReaderClassName);
-    recordReader.init(dataFile, fieldsToRead, recordReaderConfig);
+    recordReader.init(dataFile, fieldsToRead, true, recordReaderConfig);
     return recordReader;
   }
 

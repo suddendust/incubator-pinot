@@ -74,7 +74,7 @@ public class ORCRecordReader implements RecordReader {
   private int _nextRowId;
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     Configuration configuration = new Configuration();
     Reader orcReader = OrcFile.createReader(new Path(dataFile.getAbsolutePath()),

@@ -98,7 +98,8 @@ public class PinotSegmentRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File indexDir, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig) {
+  public void init(File indexDir, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig) {
     init(indexDir, fieldsToRead, null, true);
   }
 

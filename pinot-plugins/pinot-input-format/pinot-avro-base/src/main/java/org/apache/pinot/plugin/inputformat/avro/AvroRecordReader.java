@@ -42,12 +42,12 @@ public class AvroRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, Set<String> fieldsToRead, boolean extractRecordAsJsonBlob, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     _avroReader = AvroUtils.getAvroReader(dataFile);
     _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
   }
 
   @Override

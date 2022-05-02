@@ -37,12 +37,13 @@ public class StreamDecoderProvider {
    * @param fieldsToRead The fields to read from the source stream
    * @return The initialized StreamMessageDecoder
    */
-  public static StreamMessageDecoder create(StreamConfig streamConfig, Set<String> fieldsToRead) {
+  public static StreamMessageDecoder create(StreamConfig streamConfig, Set<String> fieldsToRead,
+      boolean extractRecordAsJsonBlob) {
     String decoderClass = streamConfig.getDecoderClass();
     Map<String, String> decoderProperties = streamConfig.getDecoderProperties();
     try {
       StreamMessageDecoder decoder = PluginManager.get().createInstance(decoderClass);
-      decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName());
+      decoder.init(decoderProperties, fieldsToRead, streamConfig.getTopicName(), extractRecordAsJsonBlob);
       return decoder;
     } catch (Exception e) {
       throw new RuntimeException(

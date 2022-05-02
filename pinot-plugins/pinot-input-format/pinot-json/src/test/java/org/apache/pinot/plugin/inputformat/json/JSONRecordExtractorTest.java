@@ -72,7 +72,7 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
   protected RecordReader createRecordReader(Set<String> fieldsToRead)
       throws IOException {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dataFile, fieldsToRead, null);
+    recordReader.init(_dataFile, fieldsToRead, true,null);
     return recordReader;
   }
 

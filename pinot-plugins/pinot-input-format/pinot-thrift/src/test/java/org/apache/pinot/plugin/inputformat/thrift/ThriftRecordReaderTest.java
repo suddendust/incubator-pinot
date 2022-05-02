@@ -96,7 +96,7 @@ public class ThriftRecordReaderTest {
   public void testReadData()
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSourceFields(), false, getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());
@@ -115,7 +115,7 @@ public class ThriftRecordReaderTest {
   public void testRewind()
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
-    recordReader.init(_tempFile, getSourceFields(), getThriftRecordReaderConfig());
+    recordReader.init(_tempFile, getSourceFields(), false, getThriftRecordReaderConfig());
     List<GenericRow> genericRows = new ArrayList<>();
     while (recordReader.hasNext()) {
       genericRows.add(recordReader.next());

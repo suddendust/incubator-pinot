@@ -47,7 +47,7 @@ public class CSVRecordReader implements RecordReader {
   }
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob, @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFile = dataFile;
     CSVRecordReaderConfig config = (CSVRecordReaderConfig) recordReaderConfig;
@@ -104,7 +104,7 @@ public class CSVRecordReader implements RecordReader {
     CSVRecordExtractorConfig recordExtractorConfig = new CSVRecordExtractorConfig();
     recordExtractorConfig.setMultiValueDelimiter(multiValueDelimiter);
     recordExtractorConfig.setColumnNames(_parser.getHeaderMap().keySet());
-    _recordExtractor.init(fieldsToRead, recordExtractorConfig);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, recordExtractorConfig);
   }
 
   private void validateHeaderForDelimiter(char delimiter, String csvHeader, CSVFormat format)

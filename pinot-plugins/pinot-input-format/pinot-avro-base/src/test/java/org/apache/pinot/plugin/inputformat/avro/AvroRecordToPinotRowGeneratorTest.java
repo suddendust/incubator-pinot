@@ -44,7 +44,7 @@ public class AvroRecordToPinotRowGeneratorTest {
     Set<String> sourceFields = Sets.newHashSet("incomingTime", "outgoingTime");
 
     AvroRecordExtractor avroRecordExtractor = new AvroRecordExtractor();
-    avroRecordExtractor.init(sourceFields, null);
+    avroRecordExtractor.init(sourceFields, true, null);
     GenericRow genericRow = new GenericRow();
     avroRecordExtractor.extract(avroRecord, genericRow);
 

@@ -46,12 +46,13 @@ public class ParquetAvroRecordReader implements RecordReader {
   private GenericRecord _nextRecord;
 
   @Override
-  public void init(File dataFile, @Nullable Set<String> fieldsToRead, @Nullable RecordReaderConfig recordReaderConfig)
+  public void init(File dataFile, @Nullable Set<String> fieldsToRead, boolean extractRecordAsJsonBlob,
+      @Nullable RecordReaderConfig recordReaderConfig)
       throws IOException {
     _dataFilePath = new Path(dataFile.getAbsolutePath());
     _parquetReader = ParquetUtils.getParquetAvroReader(_dataFilePath);
     _recordExtractor = new AvroRecordExtractor();
-    _recordExtractor.init(fieldsToRead, null);
+    _recordExtractor.init(fieldsToRead, extractRecordAsJsonBlob, null);
     _nextRecord = _parquetReader.read();
   }
 

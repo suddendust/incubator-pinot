@@ -39,7 +39,7 @@ public class AvroRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, _sourceFields, null);
+    avroRecordReader.init(_dataFile, _sourceFields, true, null);
     return avroRecordReader;
   }
 
