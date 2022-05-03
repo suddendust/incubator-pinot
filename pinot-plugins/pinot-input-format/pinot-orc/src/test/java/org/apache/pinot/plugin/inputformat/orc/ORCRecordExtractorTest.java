@@ -56,7 +56,7 @@ public class ORCRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an ORCRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     ORCRecordReader orcRecordReader = new ORCRecordReader();
     orcRecordReader.init(_dataFile, fieldsToRead, null);

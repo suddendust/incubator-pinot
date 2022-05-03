@@ -39,7 +39,7 @@ public class JSONRecordReaderTest extends AbstractRecordReaderTest {
   protected RecordReader createRecordReader()
       throws Exception {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dateFile, _sourceFields, null);
+    recordReader.init(_dateFile, _sourceFields, false, null);
     return recordReader;
   }
 

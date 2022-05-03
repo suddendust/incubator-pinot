@@ -62,7 +62,9 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   public GenericRow extract(Message from, GenericRow to) {
     if (_extractRecordAsJsonBlob) {
       try {
-        to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, JsonFormat.printer().print(from));
+        to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME,
+            JsonFormat.printer().preservingProtoFieldNames().print(from));
+        return to;
       } catch (InvalidProtocolBufferException e) {
         throw new RuntimeException("Error converting Protobuf record to JSON string", e);
       }

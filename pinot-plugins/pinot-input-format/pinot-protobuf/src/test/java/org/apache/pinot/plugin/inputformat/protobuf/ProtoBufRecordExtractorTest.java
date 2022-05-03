@@ -76,10 +76,10 @@ public class ProtoBufRecordExtractorTest extends AbstractRecordExtractorTest {
    * Creates a ProtoBufRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     ProtoBufRecordReader protoBufRecordReader = new ProtoBufRecordReader();
-    protoBufRecordReader.init(_dataFile, fieldsToRead, getProtoRecordReaderConfig());
+    protoBufRecordReader.init(_dataFile, fieldsToRead, extractRecordAsJsonBlob, getProtoRecordReaderConfig());
     return protoBufRecordReader;
   }
 

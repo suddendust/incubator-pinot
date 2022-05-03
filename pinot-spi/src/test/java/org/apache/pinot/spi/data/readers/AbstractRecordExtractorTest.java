@@ -18,6 +18,7 @@
  */
 package org.apache.pinot.spi.data.readers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Sets;
 import java.io.File;
 import java.io.IOException;
@@ -47,6 +48,7 @@ public abstract class AbstractRecordExtractorTest {
   protected List<Map<String, Object>> _inputRecords;
   private RecordReader _recordReader;
   private RecordReader _recordReaderNoIncludeList;
+  private RecordReader _recordReaderReadRecordAsJson;
   protected final File _tempDir = new File(FileUtils.getTempDirectory(), "RecordTransformationTest");
 
   @BeforeClass
@@ -56,8 +58,9 @@ public abstract class AbstractRecordExtractorTest {
     _sourceFieldNames = getSourceFields();
     _inputRecords = getInputRecords();
     createInputFile();
-    _recordReader = createRecordReader(_sourceFieldNames);
-    _recordReaderNoIncludeList = createRecordReader(null);
+    _recordReader = createRecordReader(_sourceFieldNames, false);
+    _recordReaderNoIncludeList = createRecordReader(null, false);
+    _recordReaderReadRecordAsJson = createRecordReader(null, true);
   }
 
   private static Map<String, String> createMap(Pair<String, String>[] entries) {
@@ -76,8 +79,10 @@ public abstract class AbstractRecordExtractorTest {
     String[] campaignInfo = new String[]{"yesterday", "blackbird", "here comes the sun", "hey jude"};
     double[] cost = new double[]{10000, 20000, 30000, 25000};
     long[] timestamp = new long[]{1570863600000L, 1571036400000L, 1571900400000L, 1574000000000L};
-    List[] arrays = new List[]{Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
-        "z"), Collections.singletonList("a")};
+    List[] arrays = new List[]{
+        Arrays.asList("a", "b", "c"), Arrays.asList("d", "e"), Arrays.asList("w", "x", "y",
+        "z"), Collections.singletonList("a")
+    };
     Map<String, String>[] maps = new Map[]{
         createMap(new Pair[]{new Pair<>("a", "1"), new Pair<>("b", "2")}),
         createMap(new Pair[]{new Pair<>("a", "3"), new Pair<>("b", "4")}),
@@ -113,7 +118,7 @@ public abstract class AbstractRecordExtractorTest {
     FileUtils.forceDelete(_tempDir);
   }
 
-  protected abstract RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected abstract RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException;
 
   protected abstract void createInputFile()
@@ -178,6 +183,18 @@ public abstract class AbstractRecordExtractorTest {
         _recordReaderNoIncludeList.next(genericRow);
         Map<String, Object> inputRecord = _inputRecords.get(i++);
         checkValue(inputRecord, genericRow);
+      }
+    }
+    if (_recordReaderReadRecordAsJson != null) {
+      _recordReaderReadRecordAsJson.rewind();
+      i = 0;
+      while (_recordReaderReadRecordAsJson.hasNext()) {
+        _recordReaderReadRecordAsJson.next(genericRow);
+        Map<String, Object> inputRecord = _inputRecords.get(i++);
+        ObjectMapper objectMapper = new ObjectMapper();
+        String expectedJson = objectMapper.writeValueAsString(inputRecord);
+        String actualJsonMaybe = (String) genericRow.getValue("record");
+        Assert.assertEquals(objectMapper.readTree(actualJsonMaybe), objectMapper.readTree(expectedJson));
       }
     }
   }

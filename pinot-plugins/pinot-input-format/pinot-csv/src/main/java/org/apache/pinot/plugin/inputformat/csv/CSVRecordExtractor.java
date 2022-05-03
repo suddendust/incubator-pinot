@@ -39,12 +39,14 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
 
   private Character _multiValueDelimiter = null;
   private Set<String> _fields;
+  private Set<String> _originalFields;
   private boolean _extractRecordAsJsonBlob = false;
 
   @Override
   public void init(Set<String> fields, boolean extractRecordAsJsonBlob, RecordExtractorConfig recordExtractorConfig) {
     _extractRecordAsJsonBlob = extractRecordAsJsonBlob;
     CSVRecordExtractorConfig csvRecordExtractorConfig = (CSVRecordExtractorConfig) recordExtractorConfig;
+    _originalFields = csvRecordExtractorConfig.getColumnNames();
     if (fields == null || fields.isEmpty()) {
       _fields = csvRecordExtractorConfig.getColumnNames();
     } else {
@@ -56,6 +58,15 @@ public class CSVRecordExtractor extends BaseRecordExtractor<CSVRecord> {
   @Override
   public GenericRow extract(CSVRecord from, GenericRow to) {
     if (_extractRecordAsJsonBlob) {
+      StringBuilder sb = new StringBuilder("{");
+      for (String fieldName : _originalFields) {
+        String value = from.isSet(fieldName) ? from.get(fieldName) : null;
+        sb.append(String.format("\"%s\":\"%s\",", fieldName, value));
+      }
+      //delete the last ',' and close
+      sb.deleteCharAt(sb.length() - 1).append("}");
+      to.putValue(BaseRecordExtractor.RECORD_AS_JSON_COL_NAME, sb.toString());
+      return to;
     }
     for (String fieldName : _fields) {
       String value = from.isSet(fieldName) ? from.get(fieldName) : null;

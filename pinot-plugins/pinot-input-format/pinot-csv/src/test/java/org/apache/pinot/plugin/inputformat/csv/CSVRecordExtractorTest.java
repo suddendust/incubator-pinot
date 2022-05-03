@@ -48,7 +48,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a CSVRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
     csvRecordReaderConfig.setMultiValueDelimiter(CSV_MULTI_VALUE_DELIMITER);
@@ -127,7 +127,7 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     HashSet<String> fieldsToRead = new HashSet<>();
     fieldsToRead.add("first");
     fieldsToRead.add("second");
-    csvRecordReader.init(escapedFile, fieldsToRead, csvRecordReaderConfig);
+    csvRecordReader.init(escapedFile, fieldsToRead, false, csvRecordReaderConfig);
     GenericRow genericRow = new GenericRow();
     csvRecordReader.rewind();
 
@@ -136,5 +136,32 @@ public class CSVRecordExtractorTest extends AbstractRecordExtractorTest {
     csvRecordReader.next(genericRow);
     Assert.assertEquals(genericRow.getValue("first"), "string1");
     Assert.assertEquals(genericRow.getValue("second"), " string2, string3");
+  }
+
+  @Test
+  public void testReadCSVAsJsonBlob()
+      throws Exception {
+    // Create CSV config with backslash as escape character.
+    CSVRecordReaderConfig csvRecordReaderConfig = new CSVRecordReaderConfig();
+    csvRecordReaderConfig.setEscapeCharacter('\\');
+
+    // Create a CSV file where records have two values and the second value contains an escaped comma.
+    File escapedFile = new File(_tempDir, "file.csv");
+    BufferedWriter writer = new BufferedWriter(new FileWriter(escapedFile));
+    writer.write("first,second\n");
+    writer.write("string1,string2");
+    writer.close();
+
+    // Try to parse CSV file with escaped comma.
+    CSVRecordReader csvRecordReader = new CSVRecordReader();
+    HashSet<String> fieldsToRead = new HashSet<>();
+    csvRecordReader.init(escapedFile, fieldsToRead, true, csvRecordReaderConfig);
+    GenericRow genericRow = new GenericRow();
+    csvRecordReader.rewind();
+
+    // check if parsing succeeded.
+    Assert.assertTrue(csvRecordReader.hasNext());
+    csvRecordReader.next(genericRow);
+    Assert.assertEquals(genericRow.getValue("record"), "{\"first\":\"string1\",\"second\":\"string2\"}");
   }
 }

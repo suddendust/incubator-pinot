@@ -31,6 +31,7 @@ import java.util.Set;
 import org.apache.pinot.spi.data.readers.AbstractRecordExtractorTest;
 import org.apache.pinot.spi.data.readers.RecordReader;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.testng.annotations.Test;
 
 
 /**
@@ -69,10 +70,10 @@ public class JSONRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create a JSONRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     JSONRecordReader recordReader = new JSONRecordReader();
-    recordReader.init(_dataFile, fieldsToRead, true,null);
+    recordReader.init(_dataFile, fieldsToRead, extractRecordAsJsonBlob, null);
     return recordReader;
   }
 

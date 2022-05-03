@@ -53,10 +53,10 @@ public class AvroRecordExtractorTest extends AbstractRecordExtractorTest {
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
-    avroRecordReader.init(_dataFile, fieldsToRead, true, null);
+    avroRecordReader.init(_dataFile, fieldsToRead, extractRecordAsJsonBlob, null);
     return avroRecordReader;
   }
 

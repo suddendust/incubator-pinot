@@ -181,7 +181,7 @@ public class AvroRecordExtractorComplexTypesTest extends AbstractRecordExtractor
    * Create an AvroRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     AvroRecordReader avroRecordReader = new AvroRecordReader();
     avroRecordReader.init(_dataFile, fieldsToRead, true, null);

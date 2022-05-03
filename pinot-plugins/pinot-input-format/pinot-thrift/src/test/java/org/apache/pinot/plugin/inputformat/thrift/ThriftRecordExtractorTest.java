@@ -74,7 +74,7 @@ public class ThriftRecordExtractorTest extends AbstractRecordExtractorTest {
    * Creates a ThriftRecordReader
    */
   @Override
-  protected RecordReader createRecordReader(Set<String> fieldsToRead)
+  protected RecordReader createRecordReader(Set<String> fieldsToRead, boolean extractRecordAsJsonBlob)
       throws IOException {
     ThriftRecordReader recordReader = new ThriftRecordReader();
     recordReader.init(_tempFile, getSourceFields(), true, getThriftRecordReaderConfig());

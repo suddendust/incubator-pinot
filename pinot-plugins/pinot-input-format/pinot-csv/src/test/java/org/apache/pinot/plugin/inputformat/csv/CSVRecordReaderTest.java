@@ -117,7 +117,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     //execute and assert
     Assert.assertThrows(IllegalArgumentException.class,
-        () -> csvRecordReader.init(_dataFile, null, csvRecordReaderConfig));
+        () -> csvRecordReader.init(_dataFile,null, false, csvRecordReaderConfig));
   }
 
   @Test
@@ -132,7 +132,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
 
     //read all fields
     //execute and assert
-    csvRecordReader.init(_dataFile, null, csvRecordReaderConfig);
+    csvRecordReader.init(_dataFile, null, false, csvRecordReaderConfig);
     Assert.assertTrue(csvRecordReader.hasNext());
   }
 
@@ -170,7 +170,7 @@ public class CSVRecordReaderTest extends AbstractRecordReaderTest {
     CSVRecordReader csvRecordReader = new CSVRecordReader();
 
     //execute and assert
-    csvRecordReader.init(file, null, csvRecordReaderConfig);
+    csvRecordReader.init(file, null, false, csvRecordReaderConfig);
     Assert.assertTrue(csvRecordReader.hasNext());
   }
 }

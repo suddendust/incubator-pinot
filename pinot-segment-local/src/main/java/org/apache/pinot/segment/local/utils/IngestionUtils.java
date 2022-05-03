@@ -310,6 +310,10 @@ public final class IngestionUtils {
     return fieldsForRecordExtractor;
   }
 
+  public static boolean shouldExtractRecordAsJsonBlob(@Nullable IngestionConfig ingestionConfig) {
+      return ingestionConfig != null && ingestionConfig.shouldExtractRecordAsJson();
+  }
+
   /**
    * Extracts the root-level names from the fields, to support the complex-type handling. For example,
    * a field a.b.c will return the top-level name a.

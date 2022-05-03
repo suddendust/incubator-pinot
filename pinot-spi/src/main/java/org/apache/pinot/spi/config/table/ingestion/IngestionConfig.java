@@ -47,17 +47,22 @@ public class IngestionConfig extends BaseJsonConfig {
   @JsonPropertyDescription("Config related to handling complex type")
   private final ComplexTypeConfig _complexTypeConfig;
 
+  @JsonPropertyDescription("True is the entire record has to be read as JSON without parsing")
+  private final boolean _extractRecordAsJson;
+
   @JsonCreator
   public IngestionConfig(@JsonProperty("batchIngestionConfig") @Nullable BatchIngestionConfig batchIngestionConfig,
       @JsonProperty("streamIngestionConfig") @Nullable StreamIngestionConfig streamIngestionConfig,
       @JsonProperty("filterConfig") @Nullable FilterConfig filterConfig,
       @JsonProperty("transformConfigs") @Nullable List<TransformConfig> transformConfigs,
-      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig) {
+      @JsonProperty("complexTypeConfig") @Nullable ComplexTypeConfig complexTypeConfig,
+      @JsonProperty("readRecordAsJson") boolean readRecordAsJson) {
     _batchIngestionConfig = batchIngestionConfig;
     _streamIngestionConfig = streamIngestionConfig;
     _filterConfig = filterConfig;
     _transformConfigs = transformConfigs;
     _complexTypeConfig = complexTypeConfig;
+    _extractRecordAsJson = readRecordAsJson;
   }
 
   @Nullable
@@ -83,6 +88,10 @@ public class IngestionConfig extends BaseJsonConfig {
   @Nullable
   public ComplexTypeConfig getComplexTypeConfig() {
     return _complexTypeConfig;
+  }
+
+  public boolean shouldExtractRecordAsJson() {
+    return _extractRecordAsJson;
   }
 
   public void setBatchIngestionConfig(BatchIngestionConfig batchIngestionConfig) {

@@ -33,7 +33,7 @@ import javax.annotation.Nullable;
  */
 public abstract class BaseRecordExtractor<T> implements RecordExtractor<T> {
 
-  public static final String RECORD_AS_JSON_COL_NAME = "recordAsJson";
+  public static final String RECORD_AS_JSON_COL_NAME = "record";
 
   /**
    * Converts the field value to either a single value (string, number, byte[]), multi value (Object[]) or a Map.

@@ -135,7 +135,7 @@ public class ProtoBufRecordReaderTest extends AbstractRecordReaderTest {
       throws Exception {
     RecordReader recordReader = new ProtoBufRecordReader();
     Set<String> sourceFields = getSourceFields(getPinotSchema());
-    recordReader.init(_tempFile, sourceFields, getProtoRecordReaderConfig());
+    recordReader.init(_tempFile, sourceFields, false, getProtoRecordReaderConfig());
     return recordReader;
   }
 

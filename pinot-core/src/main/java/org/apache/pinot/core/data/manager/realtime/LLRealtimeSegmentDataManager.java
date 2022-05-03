@@ -1317,7 +1317,13 @@ public class LLRealtimeSegmentDataManager extends RealtimeSegmentDataManager {
             .setUpsertComparisonColumn(tableConfig.getUpsertComparisonColumn());
 
     // Create message decoder
-    Set<String> fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    boolean shouldExtractRecordAsJson = IngestionUtils.shouldExtractRecordAsJsonBlob(_tableConfig.getIngestionConfig());
+    //by default, read all fields
+    Set<String> fieldsToRead = null;
+    //if the entire record is NOT to be read as JSON, then figure out what fields to read
+    if (!shouldExtractRecordAsJson) {
+      fieldsToRead = IngestionUtils.getFieldsForRecordExtractor(_tableConfig.getIngestionConfig(), _schema);
+    }
     //fixme: Pass flag from props
     _messageDecoder = StreamDecoderProvider.create(_partitionLevelStreamConfig, fieldsToRead, true);
     _clientId = streamTopic + "-" + _partitionGroupId;
