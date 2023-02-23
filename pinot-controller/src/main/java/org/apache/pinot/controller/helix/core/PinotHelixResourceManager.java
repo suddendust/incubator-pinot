@@ -112,6 +112,7 @@ import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metadata.instance.InstanceZKMetadata;
 import org.apache.pinot.common.metadata.segment.SegmentZKMetadata;
 import org.apache.pinot.common.minion.MinionTaskMetadataUtils;
+import org.apache.pinot.common.tier.Tier;
 import org.apache.pinot.common.utils.BcryptUtils;
 import org.apache.pinot.common.utils.HashUtil;
 import org.apache.pinot.common.utils.config.AccessControlUserConfigUtils;
@@ -164,6 +165,7 @@ import org.apache.pinot.spi.utils.CommonConstants.Helix.StateModel.SegmentStateM
 import org.apache.pinot.spi.utils.IngestionConfigUtils;
 import org.apache.pinot.spi.utils.InstanceTypeUtils;
 import org.apache.pinot.spi.utils.JsonUtils;
+import org.apache.pinot.spi.utils.RebalanceConfigConstants;
 import org.apache.pinot.spi.utils.TimeUtils;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.apache.pinot.spi.utils.retry.RetryPolicies;
@@ -745,13 +747,53 @@ public class PinotHelixResourceManager {
     return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
   }
 
-  public boolean rebalanceStatus(String tableNameWithType, Set<String> segmentsToMonitor) {
+  public boolean rebalanceStatus(String tableNameWithType, Configuration rebalanceConfig) {
+
     IdealState idealState = getTableIdealState(tableNameWithType);
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+
     ExternalView externalView = getTableExternalView(tableNameWithType);
     Preconditions.checkState(externalView != null, "Failed to find external view for table: %s", tableNameWithType);
-    return isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-        idealState.getRecord().getMapFields(), true, segmentsToMonitor);
+
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
+
+    SegmentAssignment segmentAssignment =
+        SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+
+    TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager);
+
+    boolean reassignInstances = rebalanceConfig.getBoolean(
+        RebalanceConfigConstants.REASSIGN_INSTANCES,
+        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
+
+    boolean bootstrap =
+        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
+
+    boolean dryRun =
+        rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
+
+    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
+        tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
+
+    Map<String, Map<String, String>> targetAssignment = null;
+
+    try {
+      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
+
+      Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
+      targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap,
+          sortedTiers,
+          tableRebalancer.getTierToInstancePartitionsMap(tableNameWithType, sortedTiers), rebalanceConfig);
+
+      return currentAssignment.equals(targetAssignment);
+
+    } catch (Exception e) {
+      LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
+          tableNameWithType, e);
+      return false;
+    }
+
   }
 
 
@@ -2465,17 +2507,6 @@ public class PinotHelixResourceManager {
       LOGGER.warn("No reload message sent for segment: {} in table: {}", segmentName, tableNameWithType);
     }
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
-  }
-
-  public void getRebalanceStatus(String tableNameWithType, String jobId) {
-
-    IdealState idealState = getTableIdealState(tableNameWithType);
-    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
-    ExternalView externalView = getTableExternalView(tableNameWithType);
-    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
-
-    isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
-        idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)
   }
 
   /**

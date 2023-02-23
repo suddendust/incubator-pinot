@@ -417,7 +417,7 @@ public class TableRebalancer {
     }
   }
 
-  private Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
+  public Map<InstancePartitionsType, InstancePartitions> getInstancePartitionsMap(TableConfig tableConfig,
       boolean reassignInstances, boolean bootstrap, boolean dryRun) {
     Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap = new TreeMap<>();
     if (tableConfig.getTableType() == TableType.OFFLINE) {
@@ -511,7 +511,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private List<Tier> getSortedTiers(TableConfig tableConfig) {
+  public List<Tier> getSortedTiers(TableConfig tableConfig) {
     List<TierConfig> tierConfigs = tableConfig.getTierConfigsList();
     if (CollectionUtils.isNotEmpty(tierConfigs)) {
       // Get tiers with storageType = "PINOT_SERVER". This is the only type available right now.
@@ -524,7 +524,7 @@ public class TableRebalancer {
   }
 
   @Nullable
-  private Map<String, InstancePartitions> getTierToInstancePartitionsMap(String tableNameWithType,
+  public Map<String, InstancePartitions> getTierToInstancePartitionsMap(String tableNameWithType,
       @Nullable List<Tier> sortedTiers) {
     if (sortedTiers == null) {
       return null;
