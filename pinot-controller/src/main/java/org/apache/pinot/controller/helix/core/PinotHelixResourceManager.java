@@ -747,10 +747,11 @@ public class PinotHelixResourceManager {
     return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
   }
 
-  public boolean rebalanceStatus(String tableNameWithType, Configuration rebalanceConfig) {
+  public boolean getRebalanceStatus(String tableNameWithType, Configuration rebalanceConfig)
+      throws TableNotFoundException {
 
-    IdealState idealState = getTableIdealState(tableNameWithType);
-    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    IdealState currentIdealstate = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(currentIdealstate != null, "Failed to find ideal state for table: %s", tableNameWithType);
 
     ExternalView externalView = getTableExternalView(tableNameWithType);
     Preconditions.checkState(externalView != null, "Failed to find external view for table: %s", tableNameWithType);
@@ -758,41 +759,15 @@ public class PinotHelixResourceManager {
     TableConfig tableConfig = getTableConfig(tableNameWithType);
     Preconditions.checkState(tableConfig != null, "Failed to find table config for table: %s", tableNameWithType);
 
-    SegmentAssignment segmentAssignment =
-        SegmentAssignmentFactory.getSegmentAssignment(_helixZkManager, tableConfig);
+    rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, true);
 
-    TableRebalancer tableRebalancer = new TableRebalancer(_helixZkManager);
+    RebalanceResult dryRunResult = rebalanceTable(tableNameWithType, rebalanceConfig);
 
-    boolean reassignInstances = rebalanceConfig.getBoolean(
-        RebalanceConfigConstants.REASSIGN_INSTANCES,
-        RebalanceConfigConstants.DEFAULT_REASSIGN_INSTANCES);
+    Map<String, Map<String, String>> currentAssignment = currentIdealstate.getRecord().getMapFields();
 
-    boolean bootstrap =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP, RebalanceConfigConstants.DEFAULT_BOOTSTRAP);
+    Map<String, Map<String, String>> targetAssignment = dryRunResult.getSegmentAssignment();
 
-    boolean dryRun =
-        rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN, RebalanceConfigConstants.DEFAULT_DRY_RUN);
-
-    Map<InstancePartitionsType, InstancePartitions> instancePartitionsMap =
-        tableRebalancer.getInstancePartitionsMap(tableConfig, reassignInstances, bootstrap, dryRun);
-
-    Map<String, Map<String, String>> targetAssignment = null;
-
-    try {
-      List<Tier> sortedTiers = tableRebalancer.getSortedTiers(tableConfig);
-
-      Map<String, Map<String, String>> currentAssignment = idealState.getRecord().getMapFields();
-      targetAssignment = segmentAssignment.rebalanceTable(currentAssignment, instancePartitionsMap,
-          sortedTiers,
-          tableRebalancer.getTierToInstancePartitionsMap(tableNameWithType, sortedTiers), rebalanceConfig);
-
-      return currentAssignment.equals(targetAssignment);
-
-    } catch (Exception e) {
-      LOGGER.warn("Caught exception while calculating target assignment for table: {}, aborting the rebalance",
-          tableNameWithType, e);
-      return false;
-    }
+    return currentAssignment.equals(targetAssignment);
 
   }
 
@@ -2210,6 +2185,15 @@ public class PinotHelixResourceManager {
     jobMetadata.put(CommonConstants.ControllerJob.CONSUMING_SEGMENTS_FORCE_COMMITTED_LIST,
         JsonUtils.objectToString(consumingSegmentsCommitted));
 
+    return addControllerJobToZK(jobId, jobMetadata);
+  }
+
+  public boolean addNewRebalanceTableJob(String tableNameWithType, String jobId, Configuration rebalanceConfig) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(RebalanceConfigConstants.DRY_RUN, String.valueOf(rebalanceConfig.getBoolean(RebalanceConfigConstants.DRY_RUN)));
+    jobMetadata.put(RebalanceConfigConstants.BOOTSTRAP, String.valueOf(rebalanceConfig.getBoolean(RebalanceConfigConstants.BOOTSTRAP)));
+    jobMetadata.put(RebalanceConfigConstants.REASSIGN_INSTANCES, String.valueOf(rebalanceConfig.getBoolean(RebalanceConfigConstants.REASSIGN_INSTANCES)));
     return addControllerJobToZK(jobId, jobMetadata);
   }
 

@@ -77,7 +77,6 @@ import org.apache.pinot.common.exception.InvalidConfigException;
 import org.apache.pinot.common.exception.SchemaNotFoundException;
 import org.apache.pinot.common.exception.TableNotFoundException;
 import org.apache.pinot.common.metadata.ZKMetadataProvider;
-import org.apache.pinot.common.metadata.controllerjob.ControllerJobType;
 import org.apache.pinot.common.metrics.ControllerMeter;
 import org.apache.pinot.common.metrics.ControllerMetrics;
 import org.apache.pinot.common.restlet.resources.TableSegmentValidationInfo;
@@ -91,7 +90,6 @@ import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.api.exception.InvalidTableConfigException;
 import org.apache.pinot.controller.api.exception.TableAlreadyExistsException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
-import org.apache.pinot.controller.helix.core.assignment.segment.SegmentAssignmentUtils;
 import org.apache.pinot.controller.helix.core.minion.PinotHelixTaskResourceManager;
 import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.recommender.RecommenderDriver;
@@ -678,6 +676,7 @@ public class PinotTableRestletResource {
           // If dry-run succeeded, run rebalance asynchronously
           rebalanceConfig.setProperty(RebalanceConfigConstants.DRY_RUN, false);
           String rebalanceId = UUID.randomUUID().toString();
+          _pinotHelixResourceManager.addNewRebalanceTableJob(tableNameWithType, rebalanceId, rebalanceConfig);
           _executorService.submit(() -> {
             try {
               _pinotHelixResourceManager.rebalanceTable(tableNameWithType, rebalanceConfig);
@@ -721,7 +720,7 @@ public class PinotTableRestletResource {
   @Produces(MediaType.APPLICATION_JSON)
   @ApiOperation(value = "Get status for a submitted reload operation",
       notes = "Get status for a submitted reload operation")
-  public void getRebalanceJobStatus(
+  public boolean getRebalanceJobStatus(
       @ApiParam(value = "Rebalance job id", required = true) @PathParam("jobId") String rebalanceJobId)
       throws Exception {
     Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(rebalanceJobId);
@@ -733,6 +732,16 @@ public class PinotTableRestletResource {
     String tableNameWithType =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
 
+    boolean reassignInstances = Boolean.parseBoolean(controllerJobZKMetadata.get(RebalanceConfigConstants.REASSIGN_INSTANCES));
+    boolean bootstrap = Boolean.parseBoolean(controllerJobZKMetadata.get(RebalanceConfigConstants.BOOTSTRAP));
+    boolean dryRun = Boolean.parseBoolean(controllerJobZKMetadata.get(RebalanceConfigConstants.DRY_RUN));
+
+    Configuration rebalanceConfig = new BaseConfiguration();
+    rebalanceConfig.addProperty(RebalanceConfigConstants.DRY_RUN, dryRun);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.REASSIGN_INSTANCES, reassignInstances);
+    rebalanceConfig.addProperty(RebalanceConfigConstants.BOOTSTRAP, bootstrap);
+
+    return _pinotHelixResourceManager.getRebalanceStatus(tableNameWithType, rebalanceConfig);
   }
 
   @GET
