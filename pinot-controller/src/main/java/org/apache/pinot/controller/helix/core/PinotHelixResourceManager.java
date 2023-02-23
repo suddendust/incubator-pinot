@@ -47,6 +47,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -742,6 +743,64 @@ public class PinotHelixResourceManager {
     Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
     List<String> segments = new ArrayList<>(idealState.getPartitionSet());
     return shouldExcludeReplacedSegments ? excludeReplacedSegments(tableNameWithType, segments) : segments;
+  }
+
+  public boolean rebalanceStatus(String tableNameWithType, Set<String> segmentsToMonitor) {
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Failed to find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Failed to find external view for table: %s", tableNameWithType);
+    return isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
+        idealState.getRecord().getMapFields(), true, segmentsToMonitor);
+  }
+
+
+  @VisibleForTesting
+  static boolean isExternalViewConverged(String tableNameWithType,
+      Map<String, Map<String, String>> externalViewSegmentStates,
+      Map<String, Map<String, String>> idealStateSegmentStates, boolean bestEfforts,
+      @Nullable Set<String> segmentsToMonitor) {
+    for (Map.Entry<String, Map<String, String>> entry : idealStateSegmentStates.entrySet()) {
+      String segmentName = entry.getKey();
+      if (segmentsToMonitor != null && !segmentsToMonitor.contains(segmentName)) {
+        continue;
+      }
+      Map<String, String> externalViewInstanceStateMap = externalViewSegmentStates.get(segmentName);
+      Map<String, String> idealStateInstanceStateMap = entry.getValue();
+
+      for (Map.Entry<String, String> instanceStateEntry : idealStateInstanceStateMap.entrySet()) {
+        // Ignore OFFLINE state in IdealState
+        String idealStateInstanceState = instanceStateEntry.getValue();
+        if (idealStateInstanceState.equals(SegmentStateModel.OFFLINE)) {
+          continue;
+        }
+
+        // ExternalView should contain the segment
+        if (externalViewInstanceStateMap == null) {
+          return false;
+        }
+
+        // Check whether the instance state in ExternalView matches the IdealState
+        String instanceName = instanceStateEntry.getKey();
+        String externalViewInstanceState = externalViewInstanceStateMap.get(instanceName);
+        if (!idealStateInstanceState.equals(externalViewInstanceState)) {
+          if (SegmentStateModel.ERROR.equals(externalViewInstanceState)) {
+            if (bestEfforts) {
+              LOGGER.warn(
+                  "Found ERROR instance: {} for segment: {}, table: {}, counting it as good state (best-efforts)",
+                  instanceName, segmentName, tableNameWithType);
+            } else {
+              LOGGER.warn("Found ERROR instance: {} for segment: {}, table: {}", instanceName, segmentName,
+                  tableNameWithType);
+              throw new IllegalStateException("Found segments in ERROR state");
+            }
+          } else {
+            return false;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   /**
@@ -2408,6 +2467,17 @@ public class PinotHelixResourceManager {
     return Pair.of(numMessagesSent, segmentReloadMessage.getMsgId());
   }
 
+  public void getRebalanceStatus(String tableNameWithType, String jobId) {
+
+    IdealState idealState = getTableIdealState(tableNameWithType);
+    Preconditions.checkState(idealState != null, "Could not find ideal state for table: %s", tableNameWithType);
+    ExternalView externalView = getTableExternalView(tableNameWithType);
+    Preconditions.checkState(externalView != null, "Could not find external view for table: %s", tableNameWithType);
+
+    isExternalViewConverged(tableNameWithType, externalView.getRecord().getMapFields(),
+        idealState.getRecord().getMapFields(), bestEfforts, segmentsToMonitor)
+  }
+
   /**
    * Resets a segment. This operation invoke resetPartition via state transition message.
    */
@@ -3103,6 +3173,26 @@ public class PinotHelixResourceManager {
       throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
     }
     return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
+  }
+
+  public RebalanceResult rebalanceTable(String tableNameWithType, Configuration rebalanceConfig, String rebalanceId)
+      throws TableNotFoundException {
+    addNewRebalanceOp(tableNameWithType, rebalanceId);
+    TableConfig tableConfig = getTableConfig(tableNameWithType);
+    if (tableConfig == null) {
+      throw new TableNotFoundException("Failed to find table config for table: " + tableNameWithType);
+    }
+    return new TableRebalancer(_helixZkManager).rebalance(tableConfig, rebalanceConfig);
+  }
+
+
+  public boolean addNewRebalanceOp(String tableNameWithType, String rebalanceId) {
+    Map<String, String> jobMetadata = new HashMap<>();
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_ID, rebalanceId);
+    jobMetadata.put(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE, tableNameWithType);
+    jobMetadata.put(CommonConstants.ControllerJob.JOB_TYPE, ControllerJobType.REBALANCE_TABLE.toString());
+    jobMetadata.put(CommonConstants.ControllerJob.SUBMISSION_TIME_MS, Long.toString(System.currentTimeMillis()));
+    return addControllerJobToZK(rebalanceId, jobMetadata);
   }
 
   /**

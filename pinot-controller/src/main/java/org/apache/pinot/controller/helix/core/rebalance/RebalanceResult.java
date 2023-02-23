@@ -33,6 +33,7 @@ public class RebalanceResult {
   private final Map<InstancePartitionsType, InstancePartitions> _instanceAssignment;
   private final Map<String, Map<String, String>> _segmentAssignment;
   private final String _description;
+  private final String _rebalanceId;
 
   @JsonCreator
   public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
@@ -43,6 +44,19 @@ public class RebalanceResult {
     _description = description;
     _instanceAssignment = instanceAssignment;
     _segmentAssignment = segmentAssignment;
+    _rebalanceId = null;
+  }
+
+  @JsonCreator
+  public RebalanceResult(@JsonProperty(value = "status", required = true) Status status,
+      @JsonProperty(value = "description", required = true) String description,
+      @JsonProperty("instanceAssignment") @Nullable Map<InstancePartitionsType, InstancePartitions> instanceAssignment,
+      @JsonProperty("segmentAssignment") @Nullable Map<String, Map<String, String>> segmentAssignment, String rebalanceId) {
+    _status = status;
+    _description = description;
+    _instanceAssignment = instanceAssignment;
+    _segmentAssignment = segmentAssignment;
+    _rebalanceId = rebalanceId;
   }
 
   @JsonProperty

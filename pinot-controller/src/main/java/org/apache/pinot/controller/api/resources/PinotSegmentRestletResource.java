@@ -61,6 +61,8 @@ import javax.ws.rs.core.Response.Status;
 import org.apache.commons.httpclient.HttpConnectionManager;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.helix.PropertyKey;
+import org.apache.helix.model.IdealState;
 import org.apache.helix.store.zk.ZkHelixPropertyStore;
 import org.apache.helix.zookeeper.datamodel.ZNRecord;
 import org.apache.pinot.common.exception.InvalidConfigException;
@@ -76,6 +78,7 @@ import org.apache.pinot.controller.api.access.Authenticate;
 import org.apache.pinot.controller.api.exception.ControllerApplicationException;
 import org.apache.pinot.controller.helix.core.PinotHelixResourceManager;
 import org.apache.pinot.controller.helix.core.PinotResourceManagerResponse;
+import org.apache.pinot.controller.helix.core.rebalance.RebalanceResult;
 import org.apache.pinot.controller.util.CompletionServiceHelper;
 import org.apache.pinot.controller.util.TableMetadataReader;
 import org.apache.pinot.controller.util.TableTierReader;
@@ -631,6 +634,109 @@ public class PinotSegmentRestletResource {
     String tableNameWithType =
         controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
     Map<String, List<String>> serverToSegments;
+
+    String singleSegmentName = null;
+    if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_TYPE)
+        .equals(ControllerJobType.RELOAD_SEGMENT.toString())) {
+      // No need to query servers where this segment is not supposed to be hosted
+      singleSegmentName = controllerJobZKMetadata.get(CommonConstants.ControllerJob.SEGMENT_RELOAD_JOB_SEGMENT_NAME);
+      serverToSegments = new HashMap<>();
+      List<String> segmentList = Arrays.asList(singleSegmentName);
+      _pinotHelixResourceManager.getServers(tableNameWithType, singleSegmentName).forEach(server -> {
+        serverToSegments.put(server, segmentList);
+      });
+    } else {
+      serverToSegments = _pinotHelixResourceManager.getServerToSegmentsMap(tableNameWithType);
+    }
+
+    BiMap<String, String> serverEndPoints =
+        _pinotHelixResourceManager.getDataInstanceAdminEndpoints(serverToSegments.keySet());
+    CompletionServiceHelper completionServiceHelper =
+        new CompletionServiceHelper(_executor, _connectionManager, serverEndPoints);
+
+    List<String> serverUrls = new ArrayList<>();
+    BiMap<String, String> endpointsToServers = serverEndPoints.inverse();
+    for (String endpoint : endpointsToServers.keySet()) {
+      String reloadTaskStatusEndpoint =
+          endpoint + "/controllerJob/reloadStatus/" + tableNameWithType + "?reloadJobTimestamp="
+              + controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS);
+      if (singleSegmentName != null) {
+        reloadTaskStatusEndpoint = reloadTaskStatusEndpoint + "&segmentName=" + singleSegmentName;
+      }
+      serverUrls.add(reloadTaskStatusEndpoint);
+    }
+
+    CompletionServiceHelper.CompletionServiceResponse serviceResponse =
+        completionServiceHelper.doMultiGetRequest(serverUrls, null, true, 10000);
+
+    ServerReloadControllerJobStatusResponse serverReloadControllerJobStatusResponse =
+        new ServerReloadControllerJobStatusResponse();
+    serverReloadControllerJobStatusResponse.setSuccessCount(0);
+
+    int totalSegments = 0;
+    for (Map.Entry<String, List<String>> entry: serverToSegments.entrySet()) {
+      totalSegments += entry.getValue().size();
+    }
+    serverReloadControllerJobStatusResponse.setTotalSegmentCount(totalSegments);
+    serverReloadControllerJobStatusResponse.setTotalServersQueried(serverUrls.size());
+    serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(serviceResponse._failedResponseCount);
+
+    for (Map.Entry<String, String> streamResponse : serviceResponse._httpResponses.entrySet()) {
+      String responseString = streamResponse.getValue();
+      try {
+        ServerReloadControllerJobStatusResponse response =
+            JsonUtils.stringToObject(responseString, ServerReloadControllerJobStatusResponse.class);
+        serverReloadControllerJobStatusResponse.setSuccessCount(
+            serverReloadControllerJobStatusResponse.getSuccessCount() + response.getSuccessCount());
+      } catch (Exception e) {
+        serverReloadControllerJobStatusResponse.setTotalServerCallsFailed(
+            serverReloadControllerJobStatusResponse.getTotalServerCallsFailed() + 1
+        );
+      }
+    }
+
+    // Add ZK fields
+    serverReloadControllerJobStatusResponse.setMetadata(controllerJobZKMetadata);
+
+    // Add derived fields
+    long submissionTime =
+        Long.parseLong(controllerJobZKMetadata.get(CommonConstants.ControllerJob.SUBMISSION_TIME_MS));
+    double timeElapsedInMinutes = ((double) System.currentTimeMillis() - (double) submissionTime) / (1000.0 * 60.0);
+    int remainingSegments = serverReloadControllerJobStatusResponse.getTotalSegmentCount()
+        - serverReloadControllerJobStatusResponse.getSuccessCount();
+
+    double estimatedRemainingTimeInMinutes = -1;
+    if (serverReloadControllerJobStatusResponse.getSuccessCount() > 0) {
+      estimatedRemainingTimeInMinutes =
+          ((double) remainingSegments / (double) serverReloadControllerJobStatusResponse.getSuccessCount())
+              * timeElapsedInMinutes;
+    }
+
+    serverReloadControllerJobStatusResponse.setTimeElapsedInMinutes(timeElapsedInMinutes);
+    serverReloadControllerJobStatusResponse.setEstimatedTimeRemainingInMinutes(estimatedRemainingTimeInMinutes);
+
+    return serverReloadControllerJobStatusResponse;
+  }
+
+  @GET
+  @Path("segments/segmentReloadStatus/{jobId}")
+  @Produces(MediaType.APPLICATION_JSON)
+  @ApiOperation(value = "Get status for a submitted reload operation",
+      notes = "Get status for a submitted reload operation")
+  public ServerReloadControllerJobStatusResponse getRebalanceJobStatus(
+      @ApiParam(value = "Rebalance job id", required = true) @PathParam("jobId") String reloadJobId)
+      throws Exception {
+    Map<String, String> controllerJobZKMetadata = _pinotHelixResourceManager.getControllerJobZKMetadata(reloadJobId);
+    if (controllerJobZKMetadata == null) {
+      throw new ControllerApplicationException(LOGGER, "Failed to find controller job id: " + reloadJobId,
+          Status.NOT_FOUND);
+    }
+
+    String tableNameWithType =
+        controllerJobZKMetadata.get(CommonConstants.ControllerJob.TABLE_NAME_WITH_TYPE);
+    Map<String, List<String>> serverToSegments;
+
+
 
     String singleSegmentName = null;
     if (controllerJobZKMetadata.get(CommonConstants.ControllerJob.JOB_TYPE)
