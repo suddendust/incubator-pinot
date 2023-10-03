@@ -54,7 +54,10 @@ public class ProtoBufRecordExtractor extends BaseRecordExtractor<Message> {
   }
 
   private Object getFieldValue(Descriptors.FieldDescriptor fieldDescriptor, Message message) {
-    if (fieldDescriptor.isRepeated() || !fieldDescriptor.hasOptionalKeyword() || message.hasField(fieldDescriptor)) {
+    // Note w.r.t proto3 - If a field is not declared with optional keyword, there's no way to distinguish
+    // if its explicitly set to a proto default or not been set at all i.e hasField() returns false
+    // and we would use null.
+    if (fieldDescriptor.isRepeated() || !fieldDescriptor.hasPresence() || message.hasField(fieldDescriptor)) {
       return message.getField(fieldDescriptor);
     } else {
       return null;
