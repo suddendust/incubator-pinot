@@ -174,6 +174,15 @@
 
     <!-- Configuration for Packaging -->
     <shade.prefix>org.apache.pinot.shaded</shade.prefix>
+    <maven-jar-plugin.version>3.3.0</maven-jar-plugin.version>
+    <maven-enforcer-plugin.version>3.4.1</maven-enforcer-plugin.version>
+    <surefire.version>3.1.2</surefire.version>
+
+    <!-- Configuration for Scala -->
+    <scala.version>2.12.18</scala.version>
+    <scala.compat.version>2.12</scala.compat.version>
+
+    <flink.version>1.12.0</flink.version>
   </properties>
 
   <profiles>
@@ -222,74 +231,14 @@
       </build>
     </profile>
     <profile>
-      <id>jdk-8-maven-compiler-plugin</id>
+      <id>scala-2.13</id>
       <activation>
-        <property>
-          <name>jdk.version</name>
-          <value>8</value>
-        </property>
+        <activeByDefault>false</activeByDefault>
       </activation>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
-              <configuration>
-                <source>8</source>
-                <target>8</target>
-                <fork>true</fork>
-                <encoding>${project.build.sourceEncoding}</encoding>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-      <dependencyManagement>
-        <!-- The updated version of these plugins don't work on Java 8 -->
-        <dependencies>
-          <dependency>
-            <groupId>nl.jqno.equalsverifier</groupId>
-            <artifactId>equalsverifier</artifactId>
-            <version>3.6</version>
-            <scope>test</scope>
-          </dependency>
-          <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>3.12.4</version>
-            <scope>test</scope>
-          </dependency>
-        </dependencies>
-      </dependencyManagement>
-    </profile>
-    <profile>
-      <id>other-jdk-maven-compiler-plugin</id>
-      <activation>
-        <property>
-          <name>jdk.version</name>
-          <value>!8</value>
-        </property>
-      </activation>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
-              <configuration>
-                <release>${jdk.version}</release>
-                <source>${jdk.version}</source>
-                <target>${jdk.version}</target>
-                <fork>true</fork>
-                <encoding>${project.build.sourceEncoding}</encoding>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
+      <properties>
+        <scala.version>2.13.3</scala.version>
+        <scala.compat.version>2.13</scala.compat.version>
+      </properties>
     </profile>
   </profiles>
   <dependencyManagement>
@@ -1257,6 +1206,24 @@
         <type>pom</type>
         <scope>import</scope>
       </dependency>
+
+      <dependency>
+        <groupId>org.scala-lang</groupId>
+        <artifactId>scala-library</artifactId>
+        <version>${scala.version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-clients_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.flink</groupId>
+        <artifactId>flink-streaming-java_${scala.compat.version}</artifactId>
+        <version>${flink.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
   <build>
@@ -1460,6 +1427,75 @@
               </goals>
             </execution>
           </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.8.0</version>
+          <configuration>
+            <release>${jdk.version}</release>
+            <source>${jdk.version}</source>
+            <target>${jdk.version}</target>
+            <fork>true</fork>
+            <encoding>${project.build.sourceEncoding}</encoding>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>net.alchim31.maven</groupId>
+          <artifactId>scala-maven-plugin</artifactId>
+          <version>3.2.2</version>
+          <executions>
+            <execution>
+              <id>add-source</id>
+              <phase>generate-sources</phase>
+              <goals>
+                <goal>add-source</goal>
+              </goals>
+              <configuration>
+                <sourceDir>src/main/java</sourceDir>
+              </configuration>
+            </execution>
+            <execution>
+              <id>scala-compile-first</id>
+              <phase>process-resources</phase>
+              <goals>
+                <goal>compile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>scala-test-compile-first</id>
+              <phase>process-test-resources</phase>
+              <goals>
+                <goal>testCompile</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>attach-scaladocs</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>doc-jar</goal>
+              </goals>
+            </execution>
+          </executions>
+          <configuration>
+            <scalaVersion>${scala.version}</scalaVersion>
+            <args>
+              <arg>-unchecked</arg>
+              <arg>-deprecation</arg>
+              <arg>-feature</arg>
+            </args>
+            <jvmArgs>
+              <jvmArg>-Xms1024m</jvmArg>
+              <jvmArg>-Xmx1024m</jvmArg>
+            </jvmArgs>
+            <javacArgs>
+              <javacArg>-source</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-target</javacArg>
+              <javacArg>${jdk.version}</javacArg>
+              <javacArg>-Xlint:all,-serial,-path</javacArg>
+            </javacArgs>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>
