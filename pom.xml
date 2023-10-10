@@ -166,7 +166,7 @@
     <kafka.version>2.0</kafka.version>
     <protobuf.version>3.24.3</protobuf.version>
     <grpc.version>1.53.0</grpc.version>
-    <confluent.version>7.4.0</confluent.version>
+    <confluent.version>7.2.6</confluent.version>
 
     <!-- Checkstyle violation prop.-->
     <checkstyle.violation.severity>warning</checkstyle.violation.severity>
