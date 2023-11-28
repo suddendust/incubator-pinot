@@ -63,6 +63,7 @@ import org.apache.pinot.minion.MinionStarter;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractor;
 import org.apache.pinot.plugin.inputformat.avro.AvroRecordExtractorConfig;
 import org.apache.pinot.plugin.inputformat.avro.AvroUtils;
+import org.apache.pinot.server.conf.ServerConf;
 import org.apache.pinot.server.starter.helix.BaseServerStarter;
 import org.apache.pinot.server.starter.helix.HelixServerStarter;
 import org.apache.pinot.spi.config.table.TableType;
@@ -164,9 +165,26 @@ public abstract class ClusterTest extends ControllerTest {
     return brokerConf;
   }
 
+  protected PinotConfiguration getBrokerConf(int brokerId, String clusterName) {
+    PinotConfiguration brokerConf = getDefaultBrokerConfiguration();
+    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, getHelixClusterName());
+    brokerConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl(clusterName));
+    brokerConf.setProperty(Broker.CONFIG_OF_BROKER_TIMEOUT_MS, 60 * 1000L);
+    brokerConf.setProperty(Helix.KEY_OF_BROKER_QUERY_PORT,
+        NetUtils.findOpenPort(DEFAULT_BROKER_PORT + brokerId + RandomUtils.nextInt(10000)));
+    brokerConf.setProperty(Broker.CONFIG_OF_DELAY_SHUTDOWN_TIME_MS, 0);
+    overrideBrokerConf(brokerConf);
+    return brokerConf;
+  }
+
   protected void startBroker()
       throws Exception {
     startBrokers(1);
+  }
+
+  protected void startBroker(String clusterName)
+      throws Exception {
+    startBrokers(1, clusterName);
   }
 
   protected void startBrokers(int numBrokers)
@@ -181,10 +199,32 @@ public abstract class ClusterTest extends ControllerTest {
     _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
   }
 
+  protected void startBrokers(int numBrokers, String clusterName)
+      throws Exception {
+    _brokerStarters = new ArrayList<>(numBrokers);
+    _brokerPorts = new ArrayList<>();
+    for (int i = 0; i < numBrokers; i++) {
+      BaseBrokerStarter brokerStarter = startOneBroker(i, clusterName);
+      _brokerStarters.add(brokerStarter);
+      _brokerPorts.add(brokerStarter.getPort());
+    }
+    _brokerBaseApiUrl = "http://localhost:" + _brokerPorts.get(0);
+  }
+
   protected BaseBrokerStarter startOneBroker(int brokerId)
       throws Exception {
     HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
     brokerStarter.init(getBrokerConf(brokerId));
+    brokerStarter.start();
+    return brokerStarter;
+  }
+
+  protected BaseBrokerStarter startOneBroker(int brokerId, String clusterName)
+      throws Exception {
+    HelixBrokerStarter brokerStarter = new HelixBrokerStarter();
+    PinotConfiguration brokerConf = getBrokerConf(brokerId, clusterName);
+    brokerConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    brokerStarter.init(brokerConf);
     brokerStarter.start();
     return brokerStarter;
   }
@@ -257,6 +297,30 @@ public abstract class ClusterTest extends ControllerTest {
     return serverConf;
   }
 
+  protected PinotConfiguration getServerConf(int serverId, String clusterName) {
+    PinotConfiguration serverConf = getDefaultServerConfiguration();
+    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    serverConf.setProperty(Helix.CONFIG_OF_ZOOKEEPR_SERVER, getZkUrl(clusterName));
+    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_DATA_DIR,
+        _baseInstanceDataDir + File.separator + "PinotServer" + File.separator + "dataDir-" + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_INSTANCE_SEGMENT_TAR_DIR,
+        _baseInstanceDataDir + File.separator + "PinotServer" + File.separator + "segmentTar-" + serverId);
+
+    _serverAdminApiPort = NetUtils.findOpenPort(Server.DEFAULT_ADMIN_API_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_ADMIN_API_PORT, _serverAdminApiPort);
+    _serverNettyPort = NetUtils.findOpenPort(Helix.DEFAULT_SERVER_NETTY_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Helix.KEY_OF_SERVER_NETTY_PORT, _serverNettyPort);
+    _serverGrpcPort =
+        NetUtils.findOpenPort(Server.DEFAULT_GRPC_PORT + new Random().nextInt(10000) + serverId);
+    serverConf.setProperty(Server.CONFIG_OF_GRPC_PORT, _serverGrpcPort);
+
+    // Thread time measurement is disabled by default, enable it in integration tests.
+    // TODO: this can be removed when we eventually enable thread time measurement by default.
+    serverConf.setProperty(Server.CONFIG_OF_ENABLE_THREAD_CPU_TIME_MEASUREMENT, true);
+    overrideServerConf(serverConf);
+    return serverConf;
+  }
+
   protected void startServer()
       throws Exception {
     startServers(1);
@@ -271,10 +335,29 @@ public abstract class ClusterTest extends ControllerTest {
     }
   }
 
+  protected void startServers(int numServers, String clusterName)
+      throws Exception {
+    FileUtils.deleteQuietly(new File(_baseInstanceDataDir + File.separator + "PinotServer"));
+    _serverStarters = new ArrayList<>(numServers);
+    for (int i = 0; i < numServers; i++) {
+      _serverStarters.add(startOneServer(i, clusterName));
+    }
+  }
+
   protected BaseServerStarter startOneServer(int serverId)
       throws Exception {
     HelixServerStarter serverStarter = new HelixServerStarter();
     serverStarter.init(getServerConf(serverId));
+    serverStarter.start();
+    return serverStarter;
+  }
+
+  protected BaseServerStarter startOneServer(int serverId, String clusterName)
+      throws Exception {
+    HelixServerStarter serverStarter = new HelixServerStarter();
+    PinotConfiguration serverConf = getServerConf(serverId, clusterName);
+    serverConf.setProperty(Helix.CONFIG_OF_CLUSTER_NAME, clusterName);
+    serverStarter.init(serverConf);
     serverStarter.start();
     return serverStarter;
   }

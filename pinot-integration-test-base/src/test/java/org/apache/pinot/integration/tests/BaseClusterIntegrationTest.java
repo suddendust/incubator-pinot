@@ -158,6 +158,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return getZkUrl() + "/kafka";
   }
 
+  protected String getKafkaZKAddress(String clusterName) {
+    return getZkUrl(clusterName) + "/kafka";
+  }
+
   protected int getNumKafkaPartitions() {
     return DEFAULT_LLC_NUM_KAFKA_PARTITIONS;
   }
@@ -289,13 +293,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
    * Creates a new OFFLINE table config.
    */
   protected TableConfig createOfflineTableConfig() {
-    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName())
-        .setTimeColumnName(getTimeColumnName()).setSortedColumn(getSortedColumn())
-        .setInvertedIndexColumns(getInvertedIndexColumns()).setNoDictionaryColumns(getNoDictionaryColumns())
-        .setRangeIndexColumns(getRangeIndexColumns()).setBloomFilterColumns(getBloomFilterColumns())
-        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
-        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
-        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
+    return new TableConfigBuilder(TableType.OFFLINE).setTableName(getTableName()).setTimeColumnName(getTimeColumnName())
+        .setSortedColumn(getSortedColumn()).setInvertedIndexColumns(getInvertedIndexColumns())
+        .setNoDictionaryColumns(getNoDictionaryColumns()).setRangeIndexColumns(getRangeIndexColumns())
+        .setBloomFilterColumns(getBloomFilterColumns()).setFieldConfigList(getFieldConfigs())
+        .setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode())
+        .setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant())
+        .setIngestionConfig(getIngestionConfig()).setQueryConfig(getQueryConfig())
         .setNullHandlingEnabled(getNullHandlingEnabled()).setSegmentPartitionConfig(getSegmentPartitionConfig())
         .build();
   }
@@ -397,9 +401,8 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
   /**
    * Creates a new Upsert enabled table config.
    */
-  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName,
-      int numPartitions, Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig,
-      String primaryKeyColumn) {
+  protected TableConfig createCSVUpsertTableConfig(String tableName, @Nullable String kafkaTopicName, int numPartitions,
+      Map<String, String> streamDecoderProperties, UpsertConfig upsertConfig, String primaryKeyColumn) {
     Map<String, ColumnPartitionConfig> columnPartitionConfigMap = new HashMap<>();
     columnPartitionConfigMap.put(primaryKeyColumn, new ColumnPartitionConfig("Murmur", numPartitions));
 
@@ -416,11 +419,10 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         kafkaTopicName);
     streamConfigsMap.putAll(streamDecoderProperties);
 
-    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName)
-        .setTimeColumnName(getTimeColumnName()).setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas())
-        .setSegmentVersion(getSegmentVersion()).setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig())
-        .setBrokerTenant(getBrokerTenant()).setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig())
-        .setStreamConfigs(streamConfigsMap)
+    return new TableConfigBuilder(TableType.REALTIME).setTableName(tableName).setTimeColumnName(getTimeColumnName())
+        .setFieldConfigList(getFieldConfigs()).setNumReplicas(getNumReplicas()).setSegmentVersion(getSegmentVersion())
+        .setLoadMode(getLoadMode()).setTaskConfig(getTaskConfig()).setBrokerTenant(getBrokerTenant())
+        .setServerTenant(getServerTenant()).setIngestionConfig(getIngestionConfig()).setStreamConfigs(streamConfigsMap)
         .setNullHandlingEnabled(UpsertConfig.Mode.PARTIAL.equals(upsertConfig.getMode()) || getNullHandlingEnabled())
         .setRoutingConfig(new RoutingConfig(null, null, RoutingConfig.STRICT_REPLICA_GROUP_INSTANCE_SELECTOR_TYPE))
         .setSegmentPartitionConfig(new SegmentPartitionConfig(columnPartitionConfigMap))
@@ -466,18 +468,33 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
         Properties properties = getPinotConnectionProperties();
         properties.put("useMultistageEngine", "true");
         _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-            new JsonAsyncHttpPinotClientTransportFactory()
-                .withConnectionProperties(properties)
-                .buildTransport());
+            new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(properties).buildTransport());
       }
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
-      _pinotConnection =
-          ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
-              new JsonAsyncHttpPinotClientTransportFactory()
-                  .withConnectionProperties(getPinotConnectionProperties())
-                  .buildTransport());
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl() + "/" + getHelixClusterName(),
+          new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
+              .buildTransport());
+    }
+    return _pinotConnection;
+  }
+
+  protected org.apache.pinot.client.Connection getPinotConnection(String clusterName) {
+    // TODO: This code is assuming getPinotConnectionProperties() will always return the same values
+    if (useMultiStageQueryEngine()) {
+      if (_pinotConnectionV2 == null) {
+        Properties properties = getPinotConnectionProperties();
+        properties.put("useMultistageEngine", "true");
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + getHelixClusterName(),
+            new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(properties).buildTransport());
+      }
+      return _pinotConnectionV2;
+    }
+    if (_pinotConnection == null) {
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + getHelixClusterName(),
+          new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
+              .buildTransport());
     }
     return _pinotConnection;
   }
@@ -652,9 +669,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT);
   }
 
+  protected void startKafka(String clusterName) {
+    startKafka(KafkaStarterUtils.DEFAULT_KAFKA_PORT, clusterName);
+  }
+
   protected void startKafka(int port) {
     Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
     _kafkaStarters = KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(), kafkaConfig);
+    _kafkaStarters.get(0)
+        .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
+  }
+
+  protected void startKafka(int port, String clusterName) {
+    Properties kafkaConfig = KafkaStarterUtils.getDefaultKafkaConfiguration();
+    _kafkaStarters =
+        KafkaStarterUtils.startServers(getNumKafkaBrokers(), port, getKafkaZKAddress(clusterName), kafkaConfig);
     _kafkaStarters.get(0)
         .createTopic(getKafkaTopic(), KafkaStarterUtils.getTopicCreationProps(getNumKafkaPartitions()));
   }
@@ -682,6 +711,14 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     return 0;
   }
 
+  protected long getCurrentCountStarResult(String tableName, String clusterName) {
+    ResultSetGroup resultSetGroup = getPinotConnection(clusterName).execute("SELECT COUNT(*) FROM " + tableName);
+    if (resultSetGroup.getResultSetCount() > 0) {
+      return resultSetGroup.getResultSet(0).getLong(0);
+    }
+    return 0;
+  }
+
   /**
    * Wait for all documents to get loaded.
    *
@@ -693,10 +730,21 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
     waitForDocsLoaded(timeoutMs, true, getTableName());
   }
 
+  protected void waitForAllDocsLoaded(long timeoutMs, String clusterName)
+      throws Exception {
+    waitForDocsLoaded(timeoutMs, true, getTableName(), clusterName);
+  }
+
   protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName) {
     final long countStarResult = getCountStarResult();
     TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName) == countStarResult, 100L, timeoutMs,
         "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
+  }
+
+  protected void waitForDocsLoaded(long timeoutMs, boolean raiseError, String tableName, String clusterName) {
+    final long countStarResult = getCountStarResult();
+    TestUtils.waitForCondition(() -> getCurrentCountStarResult(tableName, clusterName) == countStarResult, 100L,
+        timeoutMs, "Failed to load " + countStarResult + " documents", raiseError, Duration.ofMillis(timeoutMs / 10));
   }
 
   /**
