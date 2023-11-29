@@ -334,7 +334,7 @@ public abstract class BaseMultipleSegmentsConversionExecutor extends BaseTaskExe
         taskConfigs.getOrDefault(BatchConfigProperties.PUSH_MODE, BatchConfigProperties.SegmentPushType.TAR.name());
     LOGGER.info("Trying to push Pinot segment with push mode {} from {}", pushMode, outputSegmentTarURI);
 
-    PushJobSpec pushJobSpec = new PushJobSpec();
+    PushJobSpec  pushJobSpec = new PushJobSpec();
     pushJobSpec.setPushAttempts(DEFUALT_PUSH_ATTEMPTS);
     pushJobSpec.setPushParallelism(DEFAULT_PUSH_PARALLELISM);
     pushJobSpec.setPushRetryIntervalMillis(DEFAULT_PUSH_RETRY_INTERVAL_MILLIS);
