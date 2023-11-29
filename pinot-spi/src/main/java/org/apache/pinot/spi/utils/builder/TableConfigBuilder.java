@@ -439,7 +439,6 @@ public class TableConfigBuilder {
     validationConfig.setReplication(_numReplicas);
     validationConfig.setPeerSegmentDownloadScheme(_peerSegmentDownloadScheme);
     validationConfig.setCrypterClassName(_crypterClassName);
-
     // Tenant config
     TenantConfig tenantConfig = new TenantConfig(_brokerTenant, _serverTenant, _tagOverrideConfig);
 

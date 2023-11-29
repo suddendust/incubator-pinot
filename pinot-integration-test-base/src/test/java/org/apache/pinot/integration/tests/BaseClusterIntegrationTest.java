@@ -486,13 +486,13 @@ public abstract class BaseClusterIntegrationTest extends ClusterTest {
       if (_pinotConnectionV2 == null) {
         Properties properties = getPinotConnectionProperties();
         properties.put("useMultistageEngine", "true");
-        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + getHelixClusterName(),
+        _pinotConnectionV2 = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + clusterName,
             new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(properties).buildTransport());
       }
       return _pinotConnectionV2;
     }
     if (_pinotConnection == null) {
-      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + getHelixClusterName(),
+      _pinotConnection = ConnectionFactory.fromZookeeper(getZkUrl(clusterName) + "/" + clusterName,
           new JsonAsyncHttpPinotClientTransportFactory().withConnectionProperties(getPinotConnectionProperties())
               .buildTransport());
     }
