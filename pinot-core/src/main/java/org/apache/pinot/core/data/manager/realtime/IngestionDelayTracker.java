@@ -24,6 +24,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -32,6 +33,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.stream.IntStream;
 import org.apache.pinot.common.metrics.ServerGauge;
 import org.apache.pinot.common.metrics.ServerMetrics;
 import org.apache.pinot.spi.utils.builder.TableNameBuilder;
@@ -91,7 +93,7 @@ public class IngestionDelayTracker {
   // Sleep interval for scheduled executor service thread that triggers read of ideal state
   private static final int SCHEDULED_EXECUTOR_THREAD_TICK_INTERVAL_MS = 300000; // 5 minutes +/- precision in timeouts
   // Once a partition is marked for verification, we wait 10 minutes to pull its ideal state.
-  private static final int PARTITION_TIMEOUT_MS = 600000;          // 10 minutes timeouts
+  private static final int PARTITION_TIMEOUT_MS = 5_000;          // 10 minutes timeouts
   // Delay scheduled executor service for this amount of time after starting service
   private static final int INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS = 100;
   private static final Logger _logger = LoggerFactory.getLogger(IngestionDelayTracker.class.getSimpleName());
@@ -148,7 +150,7 @@ public class IngestionDelayTracker {
     ((ScheduledThreadPoolExecutor) _scheduledExecutor).setThreadFactory(threadFactory);
 
     _scheduledExecutor.scheduleWithFixedDelay(this::timeoutInactivePartitions,
-            INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, _scheduledExecutorThreadTickIntervalMs, TimeUnit.MILLISECONDS);
+            INITIAL_SCHEDULED_EXECUTOR_THREAD_DELAY_MS, 60_000, TimeUnit.MILLISECONDS);
   }
 
   public IngestionDelayTracker(ServerMetrics serverMetrics, String tableNameWithType,
@@ -184,7 +186,7 @@ public class IngestionDelayTracker {
     _partitionToIngestionTimestampsMap.remove(partitionGroupId);
     // If we are removing a partition we should stop reading its ideal state.
     _partitionsMarkedForVerification.remove(partitionGroupId);
-    _serverMetrics.removePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
+    _serverMetrics.removePartitionGauge(_metricName, String.valueOf(hashCode()), partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS);
   }
 
   /*
@@ -239,19 +241,19 @@ public class IngestionDelayTracker {
       // Only publish the metric if supported by the underlying stream. If not supported the stream
       // returns Long.MIN_VALUE
       if (ingestionTimeMs >= 0) {
-        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId, ServerGauge.REALTIME_INGESTION_DELAY_MS,
-            () -> getPartitionIngestionDelayMs(partitionGroupId));
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, String.valueOf(hashCode()), partitionGroupId,
+            ServerGauge.REALTIME_INGESTION_DELAY_MS, () -> getPartitionIngestionDelayMs(partitionGroupId));
       }
       if (firstStreamIngestionTimeMs >= 0) {
         // Only publish this metric when creation time is supported by the underlying stream
         // When this timestamp is not supported it always returns the value Long.MIN_VALUE
-        _serverMetrics.setOrUpdatePartitionGauge(_metricName, partitionGroupId,
+        _serverMetrics.setOrUpdatePartitionGauge(_metricName, String.valueOf(hashCode()), partitionGroupId,
             ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
             () -> getPartitionEndToEndIngestionDelayMs(partitionGroupId));
       }
     }
     // If we are consuming we do not need to track this partition for removal.
-    _partitionsMarkedForVerification.remove(partitionGroupId);
+//    _partitionsMarkedForVerification.remove(partitionGroupId);
   }
 
   /*
@@ -290,6 +292,7 @@ public class IngestionDelayTracker {
           e.getClass(), e.getMessage());
       return;
     }
+
     for (int partitionGroupId : partitionsToVerify) {
       if (!partitionsHostedByThisServer.contains(partitionGroupId)) {
         // Partition is not hosted in this server anymore, stop tracking it

@@ -526,6 +526,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
     setOrUpdateGauge(fullGaugeName, valueSupplier);
   }
 
+  public void setOrUpdatePartitionGauge(final String tableName, final String serverName, final int partitionId,
+      final G gauge, final Supplier<Long> valueSupplier) {
+    final String fullGaugeName =
+        composeTableGaugeName(serverName + "-" + tableName, String.valueOf(partitionId), gauge);
+    setOrUpdateGauge(fullGaugeName, valueSupplier);
+  }
+
   /**
    * @deprecated please use setOrUpdateGauge(final String metricName, final Supplier<Long> valueSupplier) instead.
    *
@@ -718,6 +725,13 @@ public abstract class AbstractMetrics<QP extends AbstractMetrics.QueryPhase, M e
    */
   public void removePartitionGauge(final String tableName, final int partitionId, final G gauge) {
     final String fullGaugeName = composeTableGaugeName(tableName, String.valueOf(partitionId), gauge);
+    removeGauge(fullGaugeName);
+  }
+
+  public void removePartitionGauge(final String tableName, final String serverName, final int partitionId,
+      final G gauge) {
+    final String fullGaugeName =
+        composeTableGaugeName(serverName + "-" + tableName, String.valueOf(partitionId), gauge);
     removeGauge(fullGaugeName);
   }
 
