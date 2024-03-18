@@ -37,12 +37,12 @@ public class StaticTokenAuthProvider implements AuthProvider {
 
   public StaticTokenAuthProvider(String token) {
     _taskToken = token;
-    _requestHeaders = Collections.singletonMap(HttpHeaders.AUTHORIZATION, token);
+    _requestHeaders = Collections.singletonMap(HttpHeaders.AUTHORIZATION, makeToken("Bearer", _taskToken));
   }
 
   public StaticTokenAuthProvider(AuthConfig authConfig) {
     String header = AuthProviderUtils.getOrDefault(authConfig, HEADER, HttpHeaders.AUTHORIZATION);
-    String prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Basic");
+    String prefix = AuthProviderUtils.getOrDefault(authConfig, PREFIX, "Bearer");
     String userToken = authConfig.getProperties().get(TOKEN).toString();
 
     _taskToken = makeToken(prefix, userToken);

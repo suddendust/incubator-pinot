@@ -241,6 +241,7 @@ public class CreateSegmentCommand extends AbstractBaseAdminCommand implements Co
       futures[sequenceId] = executorService.submit(() -> {
         SegmentGeneratorConfig segmentGeneratorConfig = new SegmentGeneratorConfig(tableConfig, schema);
         segmentGeneratorConfig.setInputFilePath(dataFiles.get(sequenceId));
+        System.out.println("File: " + dataFiles.get(sequenceId));
         segmentGeneratorConfig.setFormat(_format);
         segmentGeneratorConfig.setOutDir(outDir.getPath());
         segmentGeneratorConfig.setReaderConfig(recordReaderConfig);

@@ -175,27 +175,32 @@ public class UploadSegmentCommand extends AbstractBaseAdminCommand implements Co
       URI uploadSegmentHttpURI = FileUploadDownloadClient
           .getUploadSegmentURI(_controllerProtocol, _controllerHost, Integer.parseInt(_controllerPort));
       for (File segmentFile : segmentFiles) {
-        File segmentTarFile;
-        if (segmentFile.isDirectory()) {
-          // Tar the segment directory
-          String segmentName = segmentFile.getName();
-          LOGGER.info("Compressing segment: {}", segmentName);
-          segmentTarFile = new File(tempDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
-          TarGzCompressionUtils.createTarGzFile(segmentFile, segmentTarFile);
-        } else {
-          segmentTarFile = segmentFile;
+        File segmentTarFile = null;
+        try {
+          if (segmentFile.isDirectory()) {
+            // Tar the segment directory
+            String segmentName = segmentFile.getName();
+            LOGGER.info("Compressing segment: {}", segmentName);
+            segmentTarFile = new File(tempDir, segmentName + TarGzCompressionUtils.TAR_GZ_FILE_EXTENSION);
+            TarGzCompressionUtils.createTarGzFile(segmentFile, segmentTarFile);
+          } else {
+            segmentTarFile = segmentFile;
+          }
+
+          LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
+          List<Header> headerList = AuthProviderUtils.makeAuthHeaders(
+              AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
+
+          FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
+          fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(), fileInputStream,
+              headerList, null, _tableName, _tableType);
+        } catch (Exception e) {
+          System.out.println("Failed segment: " + segmentTarFile.getName() + " exception: " + e.getMessage());
         }
-
-        LOGGER.info("Uploading segment tar file: {}", segmentTarFile);
-        List<Header> headerList =
-            AuthProviderUtils.makeAuthHeaders(
-                AuthProviderUtils.makeAuthProvider(_authProvider, _authTokenUrl, _authToken, _user, _password));
-
-        FileInputStream fileInputStream = new FileInputStream(segmentTarFile);
-        fileUploadDownloadClient.uploadSegment(uploadSegmentHttpURI, segmentTarFile.getName(),
-            fileInputStream, headerList, null, _tableName, _tableType);
       }
-    } finally {
+    }
+
+    finally {
       // Delete the temporary working directory.
       FileUtils.deleteQuietly(tempDir);
     }
