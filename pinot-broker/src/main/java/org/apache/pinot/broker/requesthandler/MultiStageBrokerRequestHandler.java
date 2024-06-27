@@ -19,6 +19,7 @@
 package org.apache.pinot.broker.requesthandler;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -267,17 +268,25 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
 
   private void fillOldBrokerResponseStats(BrokerResponseNativeV2 brokerResponse,
       List<MultiStageQueryStats.StageStats.Closed> queryStats, DispatchableSubPlan dispatchableSubPlan) {
-    List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
-    List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
-    for (DispatchablePlanFragment stagePlan : stagePlans) {
-      planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
-    }
-    MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
-    brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
-    for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
-      if (stageStats != null) { // for example pipeline breaker may not have stats
-        stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+    try {
+      List<DispatchablePlanFragment> stagePlans = dispatchableSubPlan.getQueryStageList();
+      List<PlanNode> planNodes = new ArrayList<>(stagePlans.size());
+      for (DispatchablePlanFragment stagePlan : stagePlans) {
+        planNodes.add(stagePlan.getPlanFragment().getFragmentRoot());
       }
+      MultiStageStatsTreeBuilder treeBuilder = new MultiStageStatsTreeBuilder(planNodes, queryStats);
+      brokerResponse.setStageStats(treeBuilder.jsonStatsByStage(0));
+      for (MultiStageQueryStats.StageStats.Closed stageStats : queryStats) {
+        if (stageStats != null) { // for example pipeline breaker may not have stats
+          stageStats.forEach((type, stats) -> type.mergeInto(brokerResponse, stats));
+        }
+      }
+    } catch (Exception e) {
+      LOGGER.warn("Error encountered while collecting multi-stage stats", e);
+      brokerResponse.setStageStats(JsonNodeFactory.instance.objectNode().put(
+          "error",
+          "Error encountered while collecting multi-stage stats - " + e)
+      );
     }
   }
 
