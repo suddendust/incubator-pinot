@@ -59,7 +59,7 @@ public class LuceneMutableTextIndexTest {
   public void setUp()
       throws Exception {
     TextIndexConfig config =
-            new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false);
+        new TextIndexConfig(false, null, null, false, false, null, null, true, 500, null, false, false, 0);
     _realtimeLuceneTextIndex =
         new RealtimeLuceneTextIndex(TEXT_COLUMN_NAME, INDEX_DIR, "fooBar", config);
     String[][] documents = getTextData();
