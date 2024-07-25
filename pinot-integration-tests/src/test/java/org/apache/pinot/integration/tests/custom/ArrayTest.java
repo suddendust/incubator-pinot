@@ -63,8 +63,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN'), "
             + "arrayAgg(intCol, 'INT'), "
             + "arrayAgg(longCol, 'LONG'), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(floatCol, 'FLOAT'), "
             + "arrayAgg(doubleCol, 'DOUBLE'), "
             + "arrayAgg(stringCol, 'STRING'), "
             + "arrayAgg(timestampCol, 'TIMESTAMP') "
@@ -92,8 +91,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN'), "
             + "arrayAgg(intCol, 'INT'), "
             + "arrayAgg(longCol, 'LONG'), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE'), " : "arrayAgg(floatCol, 'FLOAT'), ")
+            + "arrayAgg(floatCol, 'FLOAT'), "
             + "arrayAgg(doubleCol, 'DOUBLE'), "
             + "arrayAgg(stringCol, 'STRING'), "
             + "arrayAgg(timestampCol, 'TIMESTAMP'), "
@@ -340,9 +338,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN', true), "
             + "arrayAgg(intCol, 'INT', true), "
             + "arrayAgg(longCol, 'LONG', true), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
-            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(floatCol, 'FLOAT', true), "
             + "arrayAgg(doubleCol, 'DOUBLE', true), "
             + "arrayAgg(stringCol, 'STRING', true), "
             + "arrayAgg(timestampCol, 'TIMESTAMP', true) "
@@ -370,9 +366,7 @@ public class ArrayTest extends CustomDataQueryClusterIntegrationTest {
             + "arrayAgg(boolCol, 'BOOLEAN', true), "
             + "arrayAgg(intCol, 'INT', true), "
             + "arrayAgg(longCol, 'LONG', true), "
-            // NOTE: FLOAT array is auto converted to DOUBLE array
-            + (useMultiStageQueryEngine ? "arrayAgg(floatCol, 'DOUBLE', true), "
-            : "arrayAgg(floatCol, 'FLOAT', true), ")
+            + "arrayAgg(floatCol, 'FLOAT', true), "
             + "arrayAgg(doubleCol, 'DOUBLE', true), "
             + "arrayAgg(stringCol, 'STRING', true), "
             + "arrayAgg(timestampCol, 'TIMESTAMP', true), "
