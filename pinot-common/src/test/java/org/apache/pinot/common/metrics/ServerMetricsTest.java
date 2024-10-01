@@ -8,12 +8,12 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.version.PinotVersion;
@@ -56,7 +56,7 @@ public class ServerMetricsTest {
     _httpClient = new HttpClient();
   }
 
-//  @Test
+  //  @Test
   public void serverMeterTest() {
     //validate all global metrics
     for (ServerMeter serverMeter : ServerMeter.values()) {
@@ -72,7 +72,6 @@ public class ServerMetricsTest {
               .findFirst();
 
           Assert.assertTrue(exportedMetricMaybe.get(), "ServerMeter: " + serverMeter.getMeterName());
-
         } catch (Exception e) {
 
         }
@@ -182,6 +181,7 @@ public class ServerMetricsTest {
         PromMetric.withNameAndLabels("pinot_server_realtimeIngestionDelayMs_Value",
             List.of("partition", "43", "table", "myTable", "tableType", "REALTIME"))));
 
+    //we only match the metric name for pinot_server_version as the label value is dynamic (based on project version)
     Optional<PromMetric> pinotServerVersionMetricMaybe = exportedPrometheusMetrics.stream()
         .filter(exportedMetric -> exportedMetric._metricName.contains("pinot_server_version")).findAny();
 
@@ -263,45 +263,49 @@ public class ServerMetricsTest {
   }
 
   public static class PromMetric {
-    private String _metricName;
-    private List<Pair<String, String>> _labels;
+    private final String _metricName;
+    private final Map<String, String> _labels;
 
-    private PromMetric() {
-
+    private PromMetric(String metricName, Map<String, String> labels) {
+      this._metricName = metricName;
+      this._labels = labels;
     }
 
     public static PromMetric fromExportedMetric(String exportedMetric) {
-      //an exported metric looks like `pinot_server_nettyPooledArenasDirect_Value{k1=v1,k2=v2} 56.0`
-      String metricWithoutVal = exportedMetric.substring(0, exportedMetric.indexOf(' '));
-      if (metricWithoutVal.indexOf('{') != -1) {
-        String metricName = metricWithoutVal.substring(0, metricWithoutVal.indexOf('{'));
-        String[] kvPairs =
-            metricWithoutVal.substring(metricWithoutVal.indexOf('{') + 1, metricWithoutVal.lastIndexOf('}')).split(",");
-        List<String> labels = Arrays.stream(kvPairs).flatMap(kvPair -> Arrays.stream(kvPair.split("="))).map(a -> {
-          if (a.startsWith("\"")) {
-            return a.substring(1, a.length() - 1);
-          }
-          return a;
-        }).collect(Collectors.toList());
-        return PromMetric.withNameAndLabels(metricName, labels);
+      int spaceIndex = exportedMetric.indexOf(' ');
+      String metricWithoutVal = exportedMetric.substring(0, spaceIndex);
+      int braceIndex = metricWithoutVal.indexOf('{');
+
+      if (braceIndex != -1) {
+        String metricName = metricWithoutVal.substring(0, braceIndex);
+        String labelsString = metricWithoutVal.substring(braceIndex + 1, metricWithoutVal.lastIndexOf('}'));
+        Map<String, String> labels = parseLabels(labelsString);
+        return new PromMetric(metricName, labels);
       } else {
-        return PromMetric.withName(metricWithoutVal);
+        return new PromMetric(metricWithoutVal, new LinkedHashMap<>());
       }
+    }
+
+    private static Map<String, String> parseLabels(String labelsString) {
+      return labelsString.isEmpty() ? new LinkedHashMap<>()
+          : java.util.Arrays.stream(labelsString.split(",")).map(kvPair -> kvPair.split("="))
+              .collect(Collectors.toMap(kv -> kv[0], kv -> removeQuotes(kv[1]), (v1, v2) -> v2, LinkedHashMap::new));
+    }
+
+    private static String removeQuotes(String value) {
+      return value.startsWith("\"") ? value.substring(1, value.length() - 1) : value;
     }
 
     public static PromMetric withName(String metricName) {
-      PromMetric promMetric = new PromMetric();
-      promMetric._metricName = metricName;
-      promMetric._labels = new ArrayList<>();
-      return promMetric;
+      return new PromMetric(metricName, new LinkedHashMap<>());
     }
 
     public static PromMetric withNameAndLabels(String metricName, List<String> labels) {
-      PromMetric promMetric = withName(metricName);
+      Map<String, String> labelMap = new LinkedHashMap<>();
       for (int i = 0; i < labels.size(); i += 2) {
-        promMetric._labels.add(Pair.of(labels.get(i), labels.get(i + 1)));
+        labelMap.put(labels.get(i), labels.get(i + 1));
       }
-      return promMetric;
+      return new PromMetric(metricName, labelMap);
     }
 
     @Override
@@ -313,17 +317,7 @@ public class ServerMetricsTest {
         return false;
       }
       PromMetric that = (PromMetric) o;
-
-      if (!Objects.equal(_metricName, that._metricName) || this._labels.size() != that._labels.size()) {
-        return false;
-      }
-
-      for (Pair<String, String> label : this._labels) {
-        if (!that._labels.contains(label)) {
-          return false;
-        }
-      }
-      return true;
+      return Objects.equal(_metricName, that._metricName) && Objects.equal(_labels, that._labels);
     }
 
     @Override
@@ -331,19 +325,14 @@ public class ServerMetricsTest {
       return Objects.hashCode(_metricName, _labels);
     }
 
+    @Override
     public String toString() {
-      //first, create a CSV of labels
-      StringBuilder sb = new StringBuilder();
-      sb.append(_metricName);
+      StringBuilder sb = new StringBuilder(_metricName);
       if (!_labels.isEmpty()) {
-        sb.append("{");
-      }
-      for (Pair<String, String> label : _labels) {
-        sb.append(label.getLeft() + "=" + "\"" + label.getRight() + "\"");
-        sb.append(",");
-      }
-      if (!_labels.isEmpty()) {
-        sb.append("}");
+        sb.append('{');
+        sb.append(_labels.entrySet().stream().map(e -> e.getKey() + "=\"" + e.getValue() + "\"")
+            .collect(Collectors.joining(",")));
+        sb.append('}');
       }
       return sb.toString();
     }
