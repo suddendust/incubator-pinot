@@ -45,13 +45,16 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
-        <configuration combine.children="override">
+        <configuration>
           <properties>
             <property>
               <name>usedefaultlisteners</name>
-              <value>false</value>  <!-- This will disable all default listeners -->
+              <value>false</value> <!-- This will disable all default listeners -->
             </property>
           </properties>
+          <argLine>
+            -javaagent:/Users/prashantpandey/Downloads/jmx_prometheus_javaagent-0.19.0.jar=9021:/Users/prashantpandey/StarTree/projects/pinot-all/pinot/docker/images/pinot/etc/jmx_prometheus_javaagent/configs/controller.yml
+          </argLine>
         </configuration>
       </plugin>
 
