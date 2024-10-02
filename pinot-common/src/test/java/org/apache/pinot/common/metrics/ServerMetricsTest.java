@@ -7,18 +7,22 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.version.PinotVersion;
+import org.apache.pinot.plugin.metrics.yammer.YammerMetricName;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
 import org.apache.pinot.spi.env.PinotConfiguration;
+import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
@@ -56,27 +60,142 @@ public class ServerMetricsTest {
     _httpClient = new HttpClient();
   }
 
-  //  @Test
-  public void serverMeterTest() {
+  @Test
+  public void serverMeterTest()
+      throws IOException, URISyntaxException {
     //validate all global metrics
+    List<String> metricTypes = List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
     for (ServerMeter serverMeter : ServerMeter.values()) {
       if (serverMeter.isGlobal()) {
         _serverMetrics.addMeteredGlobalValue(serverMeter, 5L);
-        try {
-          SimpleHttpResponse response = _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
-          List<PromMetric> promMetrics = parseExportedPromMetrics(response.getResponse());
+        String meterName = serverMeter.getMeterName();
+        String fullMeterName = "pinot.server." + meterName;
+        final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(ServerMetrics.class, fullMeterName);
+        SimpleHttpResponse response = _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
+        List<PromMetric> promMetrics = parseExportedPromMetrics(response.getResponse());
 
-          //for global meters (like `pinot_server_queries_OneMinuteRate`), we only want to match the prefix
-          Optional<Boolean> exportedMetricMaybe = promMetrics.stream()
-              .map(promMetric -> promMetric._metricName.contains("pinot_server_" + serverMeter.getMeterName()))
-              .findFirst();
-
-          Assert.assertTrue(exportedMetricMaybe.get(), "ServerMeter: " + serverMeter.getMeterName());
-        } catch (Exception e) {
-
+        String promExportedMetricPrefix = ((YammerMetricName) metricName).getMetricName().getName().replace('.', '_');
+        //Count, FiveMinuteRate, MeanRate, OneMinuteRate, FifteenMinuteRate
+        for (String metricType : metricTypes) {
+          PromMetric promMetric = PromMetric.withName(promExportedMetricPrefix + "_" + metricType);
+          boolean contains = promMetrics.contains(promMetric);
         }
       }
     }
+
+    SimpleHttpResponse response = _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
+    List<PromMetric> promMetrics = parseExportedPromMetrics(response.getResponse());
+
+    Set<String> exportedMetricNamePrefixes =
+        Set.of("pinot_server_windowTimesMaxRowsReached", "pinot_server_readinessCheckBadCalls",
+            "pinot_server_queriesKilled", "pinot_server_llcControllerResponse_NotSent",
+            "pinot_server_multiStageRawMessages", "pinot_server_heapPanicLevelExceeded", "pinot_server_noTableAccess",
+            "pinot_server_heapCriticalLevelExceeded", "pinot_server_grpcTransportReady",
+            "pinot_server_llcControllerResponse_UploadSuccess", "pinot_server_nettyConnection_BytesReceived",
+            "pinot_server_nettyConnection_ResponsesSent", "pinot_server_aggregateTimesNumGroupsLimitReached",
+            "pinot_server_nettyConnection_BytesSent", "pinot_server_grpcQueries",
+            "pinot_server_llcControllerResponse_CatchUp", "pinot_server_realtime_exceptions_requestDeserialization",
+            "pinot_server_realtime_rowsConsumed", "pinot_server_helix_zookeeperReconnects",
+            "pinot_server_grpcBytesSent", "pinot_server_realtime_exceptions_uncaught",
+            "pinot_server_llcControllerResponse_Failed", "pinot_server_grpcTransportTerminated",
+            "pinot_server_llcControllerResponse_CommitSuccess", "pinot_server_realtime_offsetCommits",
+            "pinot_server_multiStageRawBytes", "pinot_server_realtime_consumptionExceptions",
+            "pinot_server_llcControllerResponse_Commit", "pinot_server_llcControllerResponse_NotLeader",
+            "pinot_server_llcControllerResponse_Processed", "pinot_server_llcControllerResponse_Discard",
+            "pinot_server_readinessCheckOkCalls", "pinot_server_hashJoinTimesMaxRowsReached",
+            "pinot_server_realtimeRowsSanitized", "pinot_server_llcControllerResponse_Keep",
+            "pinot_server_llcControllerResponse_CommitContinue", "pinot_server_llcControllerResponse_Hold",
+            "pinot_server_grpcBytesReceived", "pinot_server_realtime_exceptions_schedulingTimeout",
+            "pinot_server_queries", "pinot_server_realtime_exceptions_responseSerialization",
+            "pinot_server_indexingFailures", "pinot_server_multiStageInMemoryMessages");
+
+    for (String exportedMetricNamePrefix : exportedMetricNamePrefixes) {
+      for (String metricType : metricTypes) {
+        String exportedMetricName = exportedMetricNamePrefix + "_" + metricType;
+        Assert.assertTrue(promMetrics.contains(PromMetric.withName(exportedMetricName)));
+      }
+    }
+
+//    Assert.assertTrue(exportedPrometheusMetrics.contains(
+//        PromMetric.withName("pinot_server_llcControllerResponse_UploadSuccess_FifteenMinuteRate")));
+
+//    QUERIES("queries", true),
+//        UNCAUGHT_EXCEPTIONS("exceptions", true),
+//        REQUEST_DESERIALIZATION_EXCEPTIONS("exceptions", true),
+//        RESPONSE_SERIALIZATION_EXCEPTIONS("exceptions", true),
+//        SCHEDULING_TIMEOUT_EXCEPTIONS("exceptions", true),
+//    HELIX_ZOOKEEPER_RECONNECTS("reconnects", true),
+//    REALTIME_ROWS_CONSUMED("rows", true),
+//        REALTIME_ROWS_SANITIZED("rows", true),
+//        REALTIME_ROWS_CONSUMED("rows", true),
+//        REALTIME_ROWS_SANITIZED("rows", true),
+//        REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
+//        REALTIME_OFFSET_COMMITS("commits", true),
+//        LLC_CONTROLLER_RESPONSE_NOT_SENT("messages", true),
+//        LLC_CONTROLLER_RESPONSE_COMMIT("messages", true),
+//        LLC_CONTROLLER_RESPONSE_HOLD("messages", true),
+//        LLC_CONTROLLER_RESPONSE_CATCH_UP("messages", true),
+//        LLC_CONTROLLER_RESPONSE_DISCARD("messages", true),
+//        LLC_CONTROLLER_RESPONSE_KEEP("messages", true),
+//        LLC_CONTROLLER_RESPONSE_NOT_LEADER("messages", true),
+//        LLC_CONTROLLER_RESPONSE_FAILED("messages", true),
+//        LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS("messages", true),
+//        LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE("messages", true),
+//        LLC_CONTROLLER_RESPONSE_PROCESSED("messages", true),
+//        LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS("messages", true),
+//        NO_TABLE_ACCESS("tables", true),
+//        INDEXING_FAILURES("attributeValues", true),
+//
+//        READINESS_CHECK_OK_CALLS("readinessCheck", true),
+//        READINESS_CHECK_BAD_CALLS("readinessCheck", true),
+//        QUERIES_KILLED("query", true),
+//        HEAP_CRITICAL_LEVEL_EXCEEDED("count", true),
+//        HEAP_PANIC_LEVEL_EXCEEDED("count", true),
+//
+//        // Netty connection metrics
+//        NETTY_CONNECTION_BYTES_RECEIVED("nettyConnection", true),
+//        NETTY_CONNECTION_RESPONSES_SENT("nettyConnection", true),
+//        NETTY_CONNECTION_BYTES_SENT("nettyConnection", true),
+//
+//        // GRPC related metrics
+//        GRPC_QUERIES("grpcQueries", true),
+//        GRPC_BYTES_RECEIVED("grpcBytesReceived", true),
+//        GRPC_BYTES_SENT("grpcBytesSent", true),
+//        GRPC_TRANSPORT_READY("grpcTransport", true),
+//        GRPC_TRANSPORT_TERMINATED("grpcTransport", true),
+//        HASH_JOIN_TIMES_MAX_ROWS_REACHED("times", true),
+//        /**
+//         * Number of times the max number of groups has been reached.
+//         * It is increased at most one by one each time per stage.
+//         * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+//         * But if a single query has 2 different aggregate operators and each one reaches the limit, this will be
+//         increased
+//         * by 2.
+//         */
+//        AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED("times", true),
+//        /**
+//         * The number of blocks that have been sent to the next stage without being serialized.
+//         * This is the sum of all blocks sent by all workers in the stage.
+//         */
+//        MULTI_STAGE_IN_MEMORY_MESSAGES("messages", true),
+//        /**
+//         * The number of blocks that have been sent to the next stage in serialized format.
+//         * This is the sum of all blocks sent by all workers in the stage.
+//         */
+//        MULTI_STAGE_RAW_MESSAGES("messages", true),
+//        /**
+//         * The number of bytes that have been sent to the next stage in serialized format.
+//         * This is the sum of all bytes sent by all workers in the stage.
+//         */
+//        MULTI_STAGE_RAW_BYTES("bytes", true),
+//        /**
+//         * Number of times the max number of rows in window has been reached.
+//         * It is increased at most one by one each time per stage.
+//         * That means that if a stage has 10 workers and all of them reach the limit, this will be increased by 1.
+//         * But if a single query has 2 different window operators and each one reaches the limit, this will be
+//         increased by 2.
+//         */
+//        WINDOW_TIMES_MAX_ROWS_REACHED("times", true);
   }
 
   @Test
