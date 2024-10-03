@@ -111,9 +111,8 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
   public void serverMeterTest()
       throws Exception {
 
-    //todo: Add test for NUM_SECONDARY_QUERIES as it's not used anywhere currently
-
-    //todo: Add test for SERVER_OUT_OF_CAPACITY_EXCEPTIONS as it's not used anywhere currently
+    //get all exposed metrics before we expose any meters
+    List<PromMetric> promMetricsBefore = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
 
     addGlobalMeter(ServerMeter.QUERIES);
     assertMeterExportedCorrectly("queries", EXPORTED_METRIC_PREFIX);
@@ -139,6 +138,75 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     addGlobalMeter(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
     assertMeterExportedCorrectly("realtime_consumptionExceptions", EXPORTED_METRIC_PREFIX);
 
+    //todo: REALTIME_OFFSET_COMMITS and REALTIME_OFFSET_COMMIT_EXCEPTIONS are not used anywhere right now. This test
+    // case might need to be changed depending on how this metric is used in future
+    addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMITS);
+    assertMeterExportedCorrectly("realtime_offsetCommits", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.REALTIME_OFFSET_COMMIT_EXCEPTIONS);
+    assertMeterExportedCorrectly("realtime_exceptions_realtimeOffsetCommit", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_SENT);
+    assertMeterExportedCorrectly("llcControllerResponse_NotSent", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT);
+    assertMeterExportedCorrectly("llcControllerResponse_Commit", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_HOLD);
+    assertMeterExportedCorrectly("llcControllerResponse_Hold", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_CATCH_UP);
+    assertMeterExportedCorrectly("llcControllerResponse_CatchUp", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_DISCARD);
+    assertMeterExportedCorrectly("llcControllerResponse_Discard", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_KEEP);
+    assertMeterExportedCorrectly("llcControllerResponse_Keep", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_NOT_LEADER);
+    assertMeterExportedCorrectly("llcControllerResponse_NotLeader", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_FAILED);
+    assertMeterExportedCorrectly("llcControllerResponse_Failed", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_SUCCESS);
+    assertMeterExportedCorrectly("llcControllerResponse_CommitSuccess", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_COMMIT_CONTINUE);
+    assertMeterExportedCorrectly("llcControllerResponse_CommitContinue", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_PROCESSED);
+    assertMeterExportedCorrectly("llcControllerResponse_Processed", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.LLC_CONTROLLER_RESPONSE_UPLOAD_SUCCESS);
+    assertMeterExportedCorrectly("llcControllerResponse_UploadSuccess", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.NO_TABLE_ACCESS);
+    assertMeterExportedCorrectly("noTableAccess", EXPORTED_METRIC_PREFIX);
+
+    addGlobalMeter(ServerMeter.INDEXING_FAILURES);
+    addGlobalMeter(ServerMeter.READINESS_CHECK_OK_CALLS);
+    addGlobalMeter(ServerMeter.READINESS_CHECK_BAD_CALLS);
+    addGlobalMeter(ServerMeter.QUERIES_KILLED);
+    addGlobalMeter(ServerMeter.HEAP_CRITICAL_LEVEL_EXCEEDED);
+    addGlobalMeter(ServerMeter.HEAP_PANIC_LEVEL_EXCEEDED);
+    addGlobalMeter(ServerMeter.NETTY_CONNECTION_BYTES_RECEIVED);
+    addGlobalMeter(ServerMeter.NETTY_CONNECTION_RESPONSES_SENT);
+    addGlobalMeter(ServerMeter.NETTY_CONNECTION_BYTES_SENT);
+    addGlobalMeter(ServerMeter.GRPC_QUERIES);
+    addGlobalMeter(ServerMeter.GRPC_BYTES_RECEIVED);
+    addGlobalMeter(ServerMeter.GRPC_BYTES_SENT);
+    addGlobalMeter(ServerMeter.GRPC_TRANSPORT_READY);
+    addGlobalMeter(ServerMeter.GRPC_TRANSPORT_TERMINATED);
+
+    addGlobalMeter(ServerMeter.HASH_JOIN_TIMES_MAX_ROWS_REACHED);
+    addGlobalMeter(ServerMeter.AGGREGATE_TIMES_NUM_GROUPS_LIMIT_REACHED);
+    addGlobalMeter(ServerMeter.MULTI_STAGE_IN_MEMORY_MESSAGES);
+    addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_MESSAGES);
+    addGlobalMeter(ServerMeter.MULTI_STAGE_RAW_BYTES);
+    addGlobalMeter(ServerMeter.WINDOW_TIMES_MAX_ROWS_REACHED);
+
     addMeterWithLables(ServerMeter.REALTIME_ROWS_CONSUMED, CLIENT_ID);
     assertMeterExportedCorrectly("realtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID, EXPORTED_METRIC_PREFIX);
 
@@ -160,8 +228,6 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     addMeterWithLables(ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, CLIENT_ID);
 
-    //todo: REALTIME_OFFSET_COMMITS, REALTIME_OFFSET_COMMIT_EXCEPTIONS
-
     addMeterWithLables(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, TABLE_STREAM_NAME);
     assertMeterExportedCorrectly("realtimeConsumptionExceptions", List.of("table", "myTable_REALTIME_myTopic"),
         EXPORTED_METRIC_PREFIX);
@@ -173,8 +239,18 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
     addMeterWithLables(ServerMeter.QUERIES, TABLE_NAME_WITH_TYPE);
     assertMeterExportedCorrectly("queries", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE, EXPORTED_METRIC_PREFIX);
 
+    addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("numSecondaryQueries", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        EXPORTED_METRIC_PREFIX);
+
     addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, TABLE_NAME_WITH_TYPE);
     assertMeterExportedCorrectly("numSecondaryQueriesScheduled", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
+        EXPORTED_METRIC_PREFIX);
+
+    //todo: SERVER_OUT_OF_CAPACITY_EXCEPTIONS is not used anywhere right now. This test case might need to be changed
+    // depending on how this metric is used in future
+    addMeterWithLables(ServerMeter.SERVER_OUT_OF_CAPACITY_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("serverOutOfCapacityExceptions", EXPORTED_LABELS_FOR_TABLE_NAME_TABLE_TYPE,
         EXPORTED_METRIC_PREFIX);
 
     addMeterWithLables(ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
@@ -345,6 +421,14 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
 
     addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_TIMEOUT, RAW_TABLE_NAME);
     assertMeterExportedCorrectly("segmentUploadTimeout", List.of("table", RAW_TABLE_NAME), EXPORTED_METRIC_PREFIX);
+
+    //get all exposed metrics now
+    List<PromMetric> promMetricsAfter = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+
+    //We add 25 because 5 metrics (ROWS_WITH_ERRORS, QUERY_EXECUTION_EXCEPTIONS, QUERIES, REALTIME_ROWS_CONSUMED and
+    // REALTIME_CONSUMPTION_EXCEPTIONS) are used in 2 different ways in code
+    Assert.assertEquals(promMetricsAfter.size() - promMetricsBefore.size(),
+        ServerMeter.values().length * METER_TYPES.size() + 25);
   }
 
   @Test
