@@ -431,6 +431,9 @@ public class ServerJMXToPromMetricsTest extends PinotJMXToPromMetricsTest {
         ServerMeter.values().length * METER_TYPES.size() + 25);
   }
 
+  /**
+   * This test validates each meter defined in {@link ServerGauge}
+   */
   @Test
   public void serverGaugeTest()
       throws Exception {
