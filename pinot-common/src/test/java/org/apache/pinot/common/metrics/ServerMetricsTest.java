@@ -13,17 +13,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.pinot.common.utils.SimpleHttpResponse;
 import org.apache.pinot.common.utils.http.HttpClient;
 import org.apache.pinot.common.version.PinotVersion;
-import org.apache.pinot.plugin.metrics.yammer.YammerMetricName;
 import org.apache.pinot.plugin.metrics.yammer.YammerMetricsRegistry;
+import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.env.PinotConfiguration;
-import org.apache.pinot.spi.metrics.PinotMetricName;
 import org.apache.pinot.spi.metrics.PinotMetricUtils;
+import org.apache.pinot.spi.utils.builder.TableNameBuilder;
 import org.testng.Assert;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -39,54 +38,27 @@ public class ServerMetricsTest {
   private static final List<String> METER_TYPES =
       List.of("Count", "FiveMinuteRate", "MeanRate", "OneMinuteRate", "FifteenMinuteRate");
 
-  private static final List<String> EXPORTED_METER_PREFIXES =
-      List.of("pinot_server_numResizes", "pinot_server_upsertOutOfOrder", "pinot_server_queriesKilled",
-          "pinot_server_llcControllerResponse_NotSent", "pinot_server_incompleteRealtimeRowsConsumed",
-          "pinot_server_numSecondaryQueriesScheduled", "pinot_server_llcControllerResponse_UploadSuccess",
-          "pinot_server_numSegmentsPrunedInvalid", "pinot_server_segmentUploadTimeout",
-          "pinot_server_nettyConnection_ResponsesSent", "pinot_server_realtime_exceptions_serverOutOfCapacity",
-          "pinot_server_segmentDownloadFromRemoteFailures", "pinot_server_metadataTtlPrimaryKeysRemoved",
-          "pinot_server_segmentDirMovementFailures", "pinot_server_numMissingSegments",
-          "pinot_server_realtime_exceptions_requestDeserialization", "pinot_server_segmentDownloadFailures",
-          "pinot_server_totalKeysMarkedForDeletion", "pinot_server_helix_zookeeperReconnects",
-          "pinot_server_resizeTimeMs", "pinot_server_llcControllerResponse_Failed", "pinot_server_rowsWithErrors",
-          "pinot_server_realtime_offsetCommits", "pinot_server_realtime_consumptionExceptions",
-          "pinot_server_llcControllerResponse_NotLeader", "pinot_server_queryExecutionExceptions",
-          "pinot_server_realtime_exceptions_queryExecution", "pinot_server_deletedTtlKeysInMultipleSegments",
-          "pinot_server_readinessCheckOkCalls", "pinot_server_hashJoinTimesMaxRowsReached",
-          "pinot_server_largeQueryResponseSizeExceptions", "pinot_server_upsertMissedValidDocIdSnapshotCount",
-          "pinot_server_realtime_exceptions_responseSerialization", "pinot_server_readinessCheckBadCalls",
-          "pinot_server_multiStageRawMessages", "pinot_server_heapPanicLevelExceeded",
-          "pinot_server_grpcTransportReady", "pinot_server_realtimeRowsFiltered", "pinot_server_numSegmentsProcessed",
-          "pinot_server_aggregateTimesNumGroupsLimitReached", "pinot_server_numDocsScanned", "pinot_server_grpcQueries",
-          "pinot_server_partialUpsertKeysNotReplaced", "pinot_server_reloadFailures",
-          "pinot_server_realtimeRowsConsumed", "pinot_server_llcControllerResponse_Keep",
-          "pinot_server_realtimeDedupDropped", "pinot_server_partialUpsertOutOfOrder", "pinot_server_queries",
-          "pinot_server_indexingFailures", "pinot_server_realtime_exceptions_streamConsumerCreate",
-          "pinot_server_largeQueryResponsesSent", "pinot_server_realtimePartitionMismatch",
-          "pinot_server_segmentUploadFailure", "pinot_server_heapCriticalLevelExceeded",
-          "pinot_server_numEntriesScannedInFilter", "pinot_server_deletedSegmentCount",
-          "pinot_server_numSecondaryQueries", "pinot_server_realtimeRowsFetched",
-          "pinot_server_segmentDownloadFromPeersFailures", "pinot_server_realtime_exceptions_realtimeOffsetCommit",
-          "pinot_server_llcControllerResponse_CatchUp", "pinot_server_grpcBytesSent",
-          "pinot_server_realtime_exceptions_uncaught", "pinot_server_invalidRealtimeRowsDropped",
-          "pinot_server_llcControllerResponse_CommitSuccess", "pinot_server_numSegmentsPrunedByLimit",
-          "pinot_server_upsertPreloadFailure", "pinot_server_llcControllerResponse_Processed",
-          "pinot_server_upsertKeysInWrongSegment", "pinot_server_llcControllerResponse_Hold",
-          "pinot_server_numSegmentsQueried", "pinot_server_realtime_exceptions_schedulingTimeout",
-          "pinot_server_windowTimesMaxRowsReached", "pinot_server_deleteTableFailures", "pinot_server_noTableAccess",
-          "pinot_server_deletedKeysTtlPrimaryKeysRemoved", "pinot_server_segmentStreamedDownloadUntarFailures",
-          "pinot_server_totalThreadCpuTimeMillis", "pinot_server_deletedKeysWithinTtlWindow",
-          "pinot_server_numSegmentsMatched", "pinot_server_nettyConnection_BytesReceived",
-          "pinot_server_numEntriesScannedPostFilter", "pinot_server_nettyConnection_BytesSent",
-          "pinot_server_schedulingTimeoutExceptions", "pinot_server_realtime_rowsConsumed",
-          "pinot_server_realtimeMergedTextIdxTruncatedDocumentSize", "pinot_server_refreshFailures",
-          "pinot_server_numSegmentsPrunedByValue", "pinot_server_untarFailures", "pinot_server_grpcTransportTerminated",
-          "pinot_server_multiStageRawBytes", "pinot_server_llcControllerResponse_Commit",
-          "pinot_server_llcControllerResponse_Discard", "pinot_server_realtime_exceptions_largeQueryResponseSize",
-          "pinot_server_realtimeRowsSanitized", "pinot_server_realtimeConsumptionExceptions",
-          "pinot_server_llcControllerResponse_CommitContinue", "pinot_server_segmentUploadSuccess",
-          "pinot_server_grpcBytesReceived", "pinot_server_multiStageInMemoryMessages");
+  private static final List<String> TIMER_TYPES =
+      List.of("Count", "FiveMinuteRate", "Max", "999thPercentile", "95thPercentile", "75thPercentile", "98thPercentile",
+          "OneMinuteRate", "50thPercentile", "99thPercentile", "FifteenMinuteRate", "Mean", "StdDev", "MeanRate",
+          "Min");
+
+  private static final String RAW_TABLE_NAME = "myTable";
+  private static final String TABLE_NAME_WITH_TYPE =
+      TableNameBuilder.forType(TableType.REALTIME).tableNameWithType(RAW_TABLE_NAME);
+
+  private static final String KAFKA_TOPIC = "myTopic";
+  private static final String PARTITION_GROUP_ID = "partitionGroupId";
+  private static final String CLIENT_ID =
+      String.format("%s-%s-%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC, PARTITION_GROUP_ID);
+  private static final String TABLE_STREAM_NAME = String.format("%s_%s", TABLE_NAME_WITH_TYPE, KAFKA_TOPIC);
+
+  private static final List<String> TABLE_NAME_WITH_TYPE_EXPORTED_LABELS =
+      List.of("table", "myTable", "tableType", "REALTIME");
+
+  private static final List<String> EXPORTED_LABELS_FOR_CLIENT_ID =
+      List.of("partition", PARTITION_GROUP_ID, "table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString(),
+          "topic", KAFKA_TOPIC);
 
   @BeforeClass
   public void setup() {
@@ -107,304 +79,268 @@ public class ServerMetricsTest {
     _httpClient = new HttpClient();
   }
 
+  /**
+   * This test validates each timer defined in {@link ServerTimer}
+   */
   @Test
-  public void serverMeterTest2()
-      throws URISyntaxException, IOException {
+  public void serverTimerTest()
+      throws IOException, URISyntaxException {
+    //MeanRate, OneMinuteRate, StdDev, 95thPercentile, 99thPercentile, Mean, FifteenMinuteRate, Min, Count,
+    for (ServerTimer serverTimer : ServerTimer.values()) {
+      if (serverTimer.isGlobal()) {
+        _serverMetrics.addTimedValue(serverTimer, 30_000, TimeUnit.MILLISECONDS);
+      } else if (serverTimer == ServerTimer.SEGMENT_UPLOAD_TIME_MS) {
+        _serverMetrics.addTimedTableValue(RAW_TABLE_NAME, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
+      } else {
+        _serverMetrics.addTimedTableValue(TABLE_NAME_WITH_TYPE, serverTimer, 30_000L, TimeUnit.MILLISECONDS);
+      }
+    }
+    //assert on timers with labels
+    assertTimerExportedCorrectly("pinot_server_freshnessLagMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_nettyConnectionSendResponseLatency",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_executionThreadCpuTimeNs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_systemActivitiesCpuTimeNs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_responseSerCpuTimeNs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_segmentUploadTimeMs", List.of("table", RAW_TABLE_NAME));
 
-    String rawTableName = "myTable";
-    String tableNameWithType = "myTable" + "_" + "REALTIME";
-    String clientId = tableNameWithType + "-" + "myTopic" + "-" + "myPartitionGroupId" + "-" + "myClientId";
-    String tableStreamName = tableNameWithType + "_" + "myStreamTopic";
+    assertTimerExportedCorrectly("pinot_server_totalCpuTimeNs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_upsertPreloadTimeMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_totalCpuTimeNs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_upsertRemoveExpiredPrimaryKeysTimeMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_grpcQueryExecutionMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_upsertSnapshotTimeMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_dedupRemoveExpiredPrimaryKeysTimeMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+    assertTimerExportedCorrectly("pinot_server_secondaryQWaitTimeMs",
+        List.of("table", RAW_TABLE_NAME, "tableType", TableType.REALTIME.toString()));
+
+    //assert on all global timers
+    assertTimerExportedCorrectly("pinot_server_hashJoinBuildTableCpuTimeMs");
+    assertTimerExportedCorrectly("pinot_server_multiStageSerializationCpuTimeMs");
+    assertTimerExportedCorrectly("pinot_server_multiStageDeserializationCpuTimeMs");
+    assertTimerExportedCorrectly("pinot_server_receiveDownstreamWaitCpuTimeMs");
+    assertTimerExportedCorrectly("pinot_server_receiveUpstreamWaitCpuTimeMs");
+  }
+
+  /**
+   * This test validates each meter defined in {@link ServerMeter}
+   */
+  @Test
+  public void serverMeterTest()
+      throws Exception {
 
     //todo: Add test for NUM_SECONDARY_QUERIES as it's not used anywhere currently
 
     //todo: Add test for SERVER_OUT_OF_CAPACITY_EXCEPTIONS as it's not used anywhere currently
 
     addGlobalMeter(ServerMeter.QUERIES);
-    assertMetricExportedCorrectly("pinot_server_queries");
+    assertMeterExportedCorrectly("pinot_server_queries");
 
     addGlobalMeter(ServerMeter.UNCAUGHT_EXCEPTIONS);
-    assertMetricExportedCorrectly("pinot_server_realtime_exceptions_uncaught");
+    assertMeterExportedCorrectly("pinot_server_realtime_exceptions_uncaught");
 
     addGlobalMeter(ServerMeter.REQUEST_DESERIALIZATION_EXCEPTIONS);
-    assertMetricExportedCorrectly("pinot_server_realtime_exceptions_requestDeserialization");
+    assertMeterExportedCorrectly("pinot_server_realtime_exceptions_requestDeserialization");
 
     addGlobalMeter(ServerMeter.RESPONSE_SERIALIZATION_EXCEPTIONS);
-    assertMetricExportedCorrectly("pinot_server_realtime_exceptions_responseSerialization");
+    assertMeterExportedCorrectly("pinot_server_realtime_exceptions_responseSerialization");
 
     addGlobalMeter(ServerMeter.QUERY_EXECUTION_EXCEPTIONS);
-    assertMetricExportedCorrectly("pinot_server_realtime_exceptions_queryExecution");
+    assertMeterExportedCorrectly("pinot_server_realtime_exceptions_queryExecution");
 
     addGlobalMeter(ServerMeter.HELIX_ZOOKEEPER_RECONNECTS);
-    assertMetricExportedCorrectly("pinot_server_helix_zookeeperReconnects");
+    assertMeterExportedCorrectly("pinot_server_helix_zookeeperReconnects");
 
     addGlobalMeter(ServerMeter.REALTIME_ROWS_CONSUMED);
-    assertMetricExportedCorrectly("pinot_server_realtime_rowsConsumed");
+    assertMeterExportedCorrectly("pinot_server_realtime_rowsConsumed");
 
     addGlobalMeter(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS);
-    assertMetricExportedCorrectly("pinot_server_realtime_consumptionExceptions");
+    assertMeterExportedCorrectly("pinot_server_realtime_consumptionExceptions");
 
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_CONSUMED, clientId);
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_SANITIZED, clientId);
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_FETCHED, clientId);
-    addMeterWithLables(ServerMeter.REALTIME_ROWS_FILTERED, clientId);
-    addMeterWithLables(ServerMeter.INVALID_REALTIME_ROWS_DROPPED, clientId);
-    addMeterWithLables(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, clientId);
-    addMeterWithLables(ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, clientId);
+    addMeterWithLables(ServerMeter.REALTIME_ROWS_CONSUMED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_realtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.REALTIME_ROWS_SANITIZED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_realtimeRowsSanitized", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.REALTIME_ROWS_FETCHED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_realtimeRowsFetched", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.REALTIME_ROWS_FILTERED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_realtimeRowsFiltered", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.INVALID_REALTIME_ROWS_DROPPED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_invalidRealtimeRowsDropped", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.INCOMPLETE_REALTIME_ROWS_CONSUMED, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_incompleteRealtimeRowsConsumed", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.STREAM_CONSUMER_CREATE_EXCEPTIONS, CLIENT_ID);
 
     //todo: REALTIME_OFFSET_COMMITS, REALTIME_OFFSET_COMMIT_EXCEPTIONS
 
-    addMeterWithLables(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, tableStreamName);
+    addMeterWithLables(ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS, TABLE_STREAM_NAME);
+    assertMeterExportedCorrectly("pinot_server_realtimeConsumptionExceptions",
+        List.of("table", "myTable_REALTIME_myTopic"));
 
-    addMeterWithLables(ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE, rawTableName);
+    addMeterWithLables(ServerMeter.REALTIME_MERGED_TEXT_IDX_TRUNCATED_DOCUMENT_SIZE, RAW_TABLE_NAME);
+    assertMeterExportedCorrectly("pinot_server_realtimeMergedTextIdxTruncatedDocumentSize",
+        List.of("table", "myTable"));
 
-    addMeterWithLables(ServerMeter.QUERIES, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, tableNameWithType);
-    addMeterWithLables(ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, tableNameWithType);
-    addMeterWithLables(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, tableNameWithType);
-    addMeterWithLables(ServerMeter.DELETED_SEGMENT_COUNT, tableNameWithType);
-    addMeterWithLables(ServerMeter.DELETE_TABLE_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.REALTIME_PARTITION_MISMATCH, tableNameWithType);
-    addMeterWithLables(ServerMeter.REALTIME_DEDUP_DROPPED, tableNameWithType);
-    addMeterWithLables(ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, tableNameWithType);
-    addMeterWithLables(ServerMeter.UPSERT_OUT_OF_ORDER, tableNameWithType);
-    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED, tableNameWithType);
-    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, tableNameWithType);
-    addMeterWithLables(ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED, tableNameWithType);
-    addMeterWithLables(ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION, tableNameWithType);
-    addMeterWithLables(ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW, tableNameWithType);
-    addMeterWithLables(ServerMeter.DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS, tableNameWithType);
-    addMeterWithLables(ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED, tableNameWithType);
-    addMeterWithLables(ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, tableNameWithType);
-    addMeterWithLables(ServerMeter.UPSERT_PRELOAD_FAILURE, tableNameWithType);
+    addMeterWithLables(ServerMeter.QUERIES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_queries", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, clientId);
-    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, tableStreamName);
+    addMeterWithLables(ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSecondaryQueriesScheduled", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.NUM_DOCS_SCANNED, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_QUERIED, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PROCESSED, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_MATCHED, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_MISSING_SEGMENTS, tableNameWithType);
-    addMeterWithLables(ServerMeter.RELOAD_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.REFRESH_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.UNTAR_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.SEGMENT_DIR_MOVEMENT_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, tableNameWithType);
-    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, tableNameWithType);
+    addMeterWithLables(ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_schedulingTimeoutExceptions", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_FAILURE, rawTableName);
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_SUCCESS, rawTableName);
-    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_TIMEOUT, rawTableName);
+    addMeterWithLables(ServerMeter.QUERY_EXECUTION_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_queryExecutionExceptions", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.NUM_RESIZES, tableNameWithType);
-    addMeterWithLables(ServerMeter.RESIZE_TIME_MS, tableNameWithType);
+    addMeterWithLables(ServerMeter.DELETED_SEGMENT_COUNT, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_deletedSegmentCount", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_INVALID, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_LIMIT, tableNameWithType);
-    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE, tableNameWithType);
-    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSES_SENT, tableNameWithType);
-    addMeterWithLables(ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS, tableNameWithType);
+    addMeterWithLables(ServerMeter.DELETE_TABLE_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_deleteTableFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, tableNameWithType);
+    addMeterWithLables(ServerMeter.REALTIME_PARTITION_MISMATCH, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_realtimePartitionMismatch", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    //now, add all meters globally
-    for (ServerMeter serverMeter : ServerMeter.values()) {
-      _serverMetrics.addMeteredGlobalValue(serverMeter, 5L);
-    }
+    addMeterWithLables(ServerMeter.REALTIME_DEDUP_DROPPED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_realtimeDedupDropped", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-  }
+    addMeterWithLables(ServerMeter.UPSERT_KEYS_IN_WRONG_SEGMENT, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_upsertKeysInWrongSegment", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-  private void assertMetricExportedCorrectly(String exportedMeterPrefix)
-      throws IOException, URISyntaxException {
-    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    addMeterWithLables(ServerMeter.UPSERT_OUT_OF_ORDER, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_upsertOutOfOrder", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    for (String meterType : METER_TYPES) {
-      Assert.assertTrue(promMetrics.contains(PromMetric.withName(exportedMeterPrefix + "_" + meterType)));
-    }
-  }
+    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_KEYS_NOT_REPLACED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_partialUpsertKeysNotReplaced", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-  private SimpleHttpResponse getExportedPromMetrics()
-      throws IOException, URISyntaxException {
-    return _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
-  }
+    addMeterWithLables(ServerMeter.PARTIAL_UPSERT_OUT_OF_ORDER, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_partialUpsertOutOfOrder", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-  @Test
-  public void serverMeterTest()
-      throws IOException, URISyntaxException {
-    //first, validate all global metrics
-    List<ServerMeter> GLOBAL_METERS_USED_LOCALLY =
-        List.of(ServerMeter.QUERIES, ServerMeter.SCHEDULING_TIMEOUT_EXCEPTIONS, ServerMeter.REALTIME_ROWS_CONSUMED,
-            ServerMeter.REALTIME_ROWS_SANITIZED, ServerMeter.REALTIME_CONSUMPTION_EXCEPTIONS,
-            ServerMeter.INDEXING_FAILURES);
-    for (ServerMeter serverMeter : ServerMeter.values()) {
-      if (serverMeter.isGlobal()) {
-        //all global meters use
-        _serverMetrics.addMeteredGlobalValue(serverMeter, 5L);
-        if (GLOBAL_METERS_USED_LOCALLY.contains(serverMeter)) {
-//          _serverMetrics.addMeteredTableValue("myTable", );
-        }
-        String meterName = serverMeter.getMeterName();
-        String fullMeterName = "pinot.server." + meterName;
-        final PinotMetricName metricName = PinotMetricUtils.makePinotMetricName(ServerMetrics.class, fullMeterName);
-        SimpleHttpResponse response = _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
-        List<PromMetric> promMetrics = parseExportedPromMetrics(response.getResponse());
+    addMeterWithLables(ServerMeter.DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_deletedKeysTtlPrimaryKeysRemoved", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-        String promExportedMetricPrefix = ((YammerMetricName) metricName).getMetricName().getName().replace('.', '_');
-        //Count, FiveMinuteRate, MeanRate, OneMinuteRate, FifteenMinuteRate
-        for (String metricType : METER_TYPES) {
-          PromMetric promMetric = PromMetric.withName(promExportedMetricPrefix + "_" + metricType);
-          boolean contains = promMetrics.contains(promMetric);
-        }
-      }
-    }
+    addMeterWithLables(ServerMeter.TOTAL_KEYS_MARKED_FOR_DELETION, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_totalKeysMarkedForDeletion", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    SimpleHttpResponse response = _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
-    List<PromMetric> promMetrics = parseExportedPromMetrics(response.getResponse());
+    addMeterWithLables(ServerMeter.DELETED_KEYS_WITHIN_TTL_WINDOW, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_deletedKeysWithinTtlWindow", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    Set<String> exportedMetricNamePrefixes =
-        Set.of("pinot_server_windowTimesMaxRowsReached", "pinot_server_readinessCheckBadCalls",
-            "pinot_server_queriesKilled", "pinot_server_llcControllerResponse_NotSent",
-            "pinot_server_multiStageRawMessages", "pinot_server_heapPanicLevelExceeded", "pinot_server_noTableAccess",
-            "pinot_server_heapCriticalLevelExceeded", "pinot_server_grpcTransportReady",
-            "pinot_server_llcControllerResponse_UploadSuccess", "pinot_server_nettyConnection_BytesReceived",
-            "pinot_server_nettyConnection_ResponsesSent", "pinot_server_aggregateTimesNumGroupsLimitReached",
-            "pinot_server_nettyConnection_BytesSent", "pinot_server_grpcQueries",
-            "pinot_server_llcControllerResponse_CatchUp", "pinot_server_realtime_exceptions_requestDeserialization",
-            "pinot_server_realtime_rowsConsumed", "pinot_server_helix_zookeeperReconnects",
-            "pinot_server_grpcBytesSent", "pinot_server_realtime_exceptions_uncaught",
-            "pinot_server_llcControllerResponse_Failed", "pinot_server_grpcTransportTerminated",
-            "pinot_server_llcControllerResponse_CommitSuccess", "pinot_server_realtime_offsetCommits",
-            "pinot_server_multiStageRawBytes", "pinot_server_realtime_consumptionExceptions",
-            "pinot_server_llcControllerResponse_Commit", "pinot_server_llcControllerResponse_NotLeader",
-            "pinot_server_llcControllerResponse_Processed", "pinot_server_llcControllerResponse_Discard",
-            "pinot_server_readinessCheckOkCalls", "pinot_server_hashJoinTimesMaxRowsReached",
-            "pinot_server_realtimeRowsSanitized", "pinot_server_llcControllerResponse_Keep",
-            "pinot_server_llcControllerResponse_CommitContinue", "pinot_server_llcControllerResponse_Hold",
-            "pinot_server_grpcBytesReceived", "pinot_server_realtime_exceptions_schedulingTimeout",
-            "pinot_server_queries", "pinot_server_realtime_exceptions_responseSerialization",
-            "pinot_server_indexingFailures", "pinot_server_multiStageInMemoryMessages");
+    addMeterWithLables(ServerMeter.DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_deletedTtlKeysInMultipleSegments", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    for (String exportedMetricNamePrefix : exportedMetricNamePrefixes) {
-      for (String metricType : METER_TYPES) {
-        String exportedMetricName = exportedMetricNamePrefix + "_" + metricType;
-        Assert.assertTrue(promMetrics.contains(PromMetric.withName(exportedMetricName)));
-      }
-    }
+    addMeterWithLables(ServerMeter.METADATA_TTL_PRIMARY_KEYS_REMOVED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_metadataTtlPrimaryKeysRemoved", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    String tableName = "myTable";
-    String tableNameWithType = "myTable_REALTIME";
+    addMeterWithLables(ServerMeter.UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_upsertMissedValidDocIdSnapshotCount",
+        TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES_SCHEDULED, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.QUERY_EXECUTION_EXCEPTIONS, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.DELETED_SEGMENT_COUNT, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.DELETE_TABLE_FAILURES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
-    _serverMetrics.addMeteredTableValue(tableName, ServerMeter.NUM_SECONDARY_QUERIES, 5L);
+    addMeterWithLables(ServerMeter.UPSERT_PRELOAD_FAILURE, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_upsertPreloadFailure", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    //tableNameWithType
-//    NUM_SECONDARY_QUERIES("queries", false),
-//    NUM_SECONDARY_QUERIES_SCHEDULED("queries", false),
-//    QUERY_EXECUTION_EXCEPTIONS("exceptions", false),
-//    DELETED_SEGMENT_COUNT("segments", false),
-//    DELETE_TABLE_FAILURES("tables", false),
-//    LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS("exceptions", false),
-//    TOTAL_THREAD_CPU_TIME_MILLIS("millis", false),
-//    LARGE_QUERY_RESPONSES_SENT("largeResponses", false),
-//    NUM_SEGMENTS_PRUNED_INVALID("numSegmentsPrunedInvalid", false),
-//        NUM_SEGMENTS_PRUNED_BY_LIMIT("numSegmentsPrunedByLimit", false),
-//        NUM_SEGMENTS_PRUNED_BY_VALUE("numSegmentsPrunedByValue", false),
-//    NUM_RESIZES("numResizes", false),
-//        RESIZE_TIME_MS("resizeTimeMs", false),
-//    SEGMENT_DIR_MOVEMENT_FAILURES("segments", false),
-//        SEGMENT_DOWNLOAD_FAILURES("segments", false),
-//        SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES("segments", false),
-//        SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES("segments", false),
-//    NUM_MISSING_SEGMENTS("segments", false),
-//        RELOAD_FAILURES("segments", false),
-//        REFRESH_FAILURES("segments", false),
-//        UNTAR_FAILURES("segments", false),
-//        SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES("segments", false, "Counts the number of segment "
-//            + "fetch failures"),
-//    NUM_DOCS_SCANNED("rows", false),
-//        NUM_ENTRIES_SCANNED_IN_FILTER("entries", false),
-//        NUM_ENTRIES_SCANNED_POST_FILTER("entries", false),
-//        NUM_SEGMENTS_QUERIED("numSegmentsQueried", false),
-//        NUM_SEGMENTS_PROCESSED("numSegmentsProcessed", false),
-//        NUM_SEGMENTS_MATCHED("numSegmentsMatched", false),
-//    DELETED_KEYS_WITHIN_TTL_WINDOW("rows", false),
-//        DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
-//        METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
-//        UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
-////        UPSERT_PRELOAD_FAILURE("count", false),
-//    UPSERT_KEYS_IN_WRONG_SEGMENT("rows", false),
-//        PARTIAL_UPSERT_OUT_OF_ORDER("rows", false),
-//        PARTIAL_UPSERT_KEYS_NOT_REPLACED("rows", false),
-//        UPSERT_OUT_OF_ORDER("rows", false),
-//        DELETED_KEYS_TTL_PRIMARY_KEYS_REMOVED("rows", false),
-//        TOTAL_KEYS_MARKED_FOR_DELETION("rows", false),
-//        DELETED_KEYS_WITHIN_TTL_WINDOW("rows", false),
-//        DELETED_TTL_KEYS_IN_MULTIPLE_SEGMENTS("rows", false),
-//        METADATA_TTL_PRIMARY_KEYS_REMOVED("rows", false),
-//        UPSERT_MISSED_VALID_DOC_ID_SNAPSHOT_COUNT("segments", false),
+    addMeterWithLables(ServerMeter.NUM_DOCS_SCANNED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numDocsScanned", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-    //raw table name
-//    SEGMENT_UPLOAD_TIMEOUT("segments", false),
-//    SEGMENT_UPLOAD_SUCCESS("segments", false),
-//    SEGMENT_UPLOAD_FAILURE("segments", false),
+    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_IN_FILTER, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numEntriesScannedInFilter", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
-//    //clientId
-//    REALTIME_ROWS_FETCHED("rows", false),
-//    REALTIME_ROWS_FILTERED("rows", false),
-//    INVALID_REALTIME_ROWS_DROPPED("rows", false),
-//    INCOMPLETE_REALTIME_ROWS_CONSUMED("rows", false),
-//    //table stream name
-//    REALTIME_CONSUMPTION_EXCEPTIONS("exceptions", true),
-//    ROWS_WITH_ERRORS("rows", false),
+    addMeterWithLables(ServerMeter.NUM_ENTRIES_SCANNED_POST_FILTER, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numEntriesScannedPostFilter", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
 
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_QUERIED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsQueried", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PROCESSED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsProcessed", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_MATCHED, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsMatched", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_MISSING_SEGMENTS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numMissingSegments", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.RELOAD_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_reloadFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.REFRESH_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_refreshFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.UNTAR_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_untarFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.SEGMENT_STREAMED_DOWNLOAD_UNTAR_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_segmentStreamedDownloadUntarFailures",
+        TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.SEGMENT_DIR_MOVEMENT_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_segmentDirMovementFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_segmentDownloadFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_REMOTE_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_segmentDownloadFromRemoteFailures",
+        TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.SEGMENT_DOWNLOAD_FROM_PEERS_FAILURES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_segmentDownloadFromPeersFailures", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_RESIZES, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numResizes", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.RESIZE_TIME_MS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_resizeTimeMs", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_INVALID, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsPrunedInvalid", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_LIMIT, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsPrunedByLimit", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.NUM_SEGMENTS_PRUNED_BY_VALUE, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_numSegmentsPrunedByValue", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSES_SENT, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_largeQueryResponsesSent", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.TOTAL_THREAD_CPU_TIME_MILLIS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_totalThreadCpuTimeMillis", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.LARGE_QUERY_RESPONSE_SIZE_EXCEPTIONS, TABLE_NAME_WITH_TYPE);
+    assertMeterExportedCorrectly("pinot_server_largeQueryResponseSizeExceptions", TABLE_NAME_WITH_TYPE_EXPORTED_LABELS);
+
+    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, CLIENT_ID);
+    assertMeterExportedCorrectly("pinot_server_rowsWithErrors", EXPORTED_LABELS_FOR_CLIENT_ID);
+
+    addMeterWithLables(ServerMeter.ROWS_WITH_ERRORS, TABLE_STREAM_NAME);
+    assertMeterExportedCorrectly("pinot_server_rowsWithErrors", List.of("table", "myTable_REALTIME_myTopic"));
+
+    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_FAILURE, RAW_TABLE_NAME);
+    assertMeterExportedCorrectly("pinot_server_segmentUploadFailure", List.of("table", RAW_TABLE_NAME));
+
+    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_SUCCESS, RAW_TABLE_NAME);
+    assertMeterExportedCorrectly("pinot_server_segmentUploadSuccess", List.of("table", RAW_TABLE_NAME));
+
+    addMeterWithLables(ServerMeter.SEGMENT_UPLOAD_TIMEOUT, RAW_TABLE_NAME);
+    assertMeterExportedCorrectly("pinot_server_segmentUploadTimeout", List.of("table", RAW_TABLE_NAME));
   }
 
   @Test
@@ -424,35 +360,36 @@ public class ServerMetricsTest {
     _serverMetrics.setOrUpdateGlobalGauge(ServerGauge.NETTY_POOLED_CHUNK_SIZE, () -> 60L);
 
     //local gauges
-    //that accept tableNameWithType
-    String rawTableName = "myTable";
-    String tableNameWithType = "myTable_REALTIME";
+    //that accept TABLE_NAME_WITH_TYPE
+    String RAW_TABLE_NAME = "myTable";
+    String TABLE_NAME_WITH_TYPE = "myTable_REALTIME";
 
-    _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.DOCUMENT_COUNT, 1L);
-    _serverMetrics.addValueToTableGauge(tableNameWithType, ServerGauge.SEGMENT_COUNT, 5L);
-    _serverMetrics.setValueOfPartitionGauge(tableNameWithType, 2, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT, 50_000_000L);
-    _serverMetrics.setValueOfPartitionGauge(tableNameWithType, 2, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 1000_000L);
+    _serverMetrics.addValueToTableGauge(TABLE_NAME_WITH_TYPE, ServerGauge.DOCUMENT_COUNT, 1L);
+    _serverMetrics.addValueToTableGauge(TABLE_NAME_WITH_TYPE, ServerGauge.SEGMENT_COUNT, 5L);
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.UPSERT_PRIMARY_KEYS_COUNT,
+        50_000_000L);
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 2, ServerGauge.DEDUP_PRIMARY_KEYS_COUNT, 1000_000L);
 
     //raw table name
-    _serverMetrics.addValueToTableGauge(rawTableName, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, 40_000L);
-    _serverMetrics.setValueOfTableGauge(rawTableName, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN, 50_000L);
-    _serverMetrics.addValueToTableGauge(rawTableName, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, 60_000L);
+    _serverMetrics.addValueToTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_OFFHEAP_MEMORY_USED, 40_000L);
+    _serverMetrics.setValueOfTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_MERGED_TEXT_IDX_DOCUMENT_AVG_LEN, 50_000L);
+    _serverMetrics.addValueToTableGauge(RAW_TABLE_NAME, ServerGauge.REALTIME_SEGMENT_NUM_PARTITIONS, 60_000L);
 
-    //that accept clientId
-    String clientId = tableNameWithType + "-" + "myTopic" + "-" + "myPartitionGroupId" + "-" + "myClientId";
+    //that accept CLIENT_ID
+    String CLIENT_ID = TABLE_NAME_WITH_TYPE + "-" + "myTopic" + "-" + "myPartitionGroupId" + "-" + "myCLIENT_ID";
 
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.LLC_PARTITION_CONSUMING, 1L);
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, 54L);
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LLC_PARTITION_CONSUMING, 1L);
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.HIGHEST_STREAM_OFFSET_CONSUMED, 54L);
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_DURATION_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(76_000));
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CREATION_WAIT_TIME_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(50_000));
-    _serverMetrics.setValueOfTableGauge(clientId,
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID,
         ServerGauge.LAST_REALTIME_SEGMENT_INITIAL_CONSUMPTION_DURATION_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(24_000));
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_CATCHUP_DURATION_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(32_000));
-    _serverMetrics.setValueOfTableGauge(clientId, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
+    _serverMetrics.setValueOfTableGauge(CLIENT_ID, ServerGauge.LAST_REALTIME_SEGMENT_COMPLETION_DURATION_SECONDS,
         TimeUnit.MILLISECONDS.toSeconds(34_000));
     _serverMetrics.setValueOfTableGauge("", ServerGauge.CONSUMPTION_QUOTA_UTILIZATION, 40);
 
@@ -460,20 +397,20 @@ public class ServerMetricsTest {
 //    serverMetrics.setValueOfTableGauge(_metricKeyName, ServerGauge.CONSUMPTION_QUOTA_UTILIZATION,
 //        ratioPercentage);
 
-    String tableStreamName = tableNameWithType + "_" + "myTableStreamTopic";
-    _serverMetrics.setValueOfTableGauge(tableStreamName, ServerGauge.STREAM_DATA_LOSS, 1L);
+    String TABLE_STREAM_NAME = TABLE_NAME_WITH_TYPE + "_" + "myTableStreamTopic";
+    _serverMetrics.setValueOfTableGauge(TABLE_STREAM_NAME, ServerGauge.STREAM_DATA_LOSS, 1L);
 
-    _serverMetrics.setOrUpdatePartitionGauge(tableNameWithType, 43, ServerGauge.REALTIME_INGESTION_DELAY_MS,
+    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, 43, ServerGauge.REALTIME_INGESTION_DELAY_MS,
         () -> 3600L);
-    _serverMetrics.setOrUpdatePartitionGauge(tableNameWithType, 45, ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS,
-        () -> 4300L);
+    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, 45,
+        ServerGauge.END_TO_END_REALTIME_INGESTION_DELAY_MS, () -> 4300L);
     _serverMetrics.setOrUpdatePartitionGauge("myTable", 21, ServerGauge.LUCENE_INDEXING_DELAY_MS, () -> 21L);
     _serverMetrics.setOrUpdatePartitionGauge("myTable", 23, ServerGauge.LUCENE_INDEXING_DELAY_DOCS, () -> 50L);
-    _serverMetrics.setValueOfPartitionGauge(tableNameWithType, 3, ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT,
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 3, ServerGauge.UPSERT_VALID_DOC_ID_SNAPSHOT_COUNT,
         23000);
-    _serverMetrics.setValueOfPartitionGauge(tableNameWithType, 3, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
+    _serverMetrics.setValueOfPartitionGauge(TABLE_NAME_WITH_TYPE, 3, ServerGauge.UPSERT_PRIMARY_KEYS_IN_SNAPSHOT_COUNT,
         30_000_000);
-    _serverMetrics.setOrUpdatePartitionGauge(tableNameWithType, 4, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
+    _serverMetrics.setOrUpdatePartitionGauge(TABLE_NAME_WITH_TYPE, 4, ServerGauge.REALTIME_INGESTION_OFFSET_LAG,
         () -> 34L);
 
     HttpClient httpClient = new HttpClient();
@@ -549,27 +486,27 @@ public class ServerMetricsTest {
 
     Assert.assertTrue(exportedPrometheusMetrics.contains(
         PromMetric.withNameAndLabels("pinot_server_llcPartitionConsuming_Value",
-            List.of("partition", "myClientId", "table", "myTable", "tableType", "REALTIME", "topic",
+            List.of("partition", "myCLIENT_ID", "table", "myTable", "tableType", "REALTIME", "topic",
                 "myTopic-myPartitionGroupId"))));
 
     Assert.assertTrue(exportedPrometheusMetrics.contains(
         PromMetric.withNameAndLabels("pinot_server_highestStreamOffsetConsumed_Value",
-            List.of("partition", "myClientId", "table", "myTable", "tableType", "REALTIME", "topic",
+            List.of("partition", "myCLIENT_ID", "table", "myTable", "tableType", "REALTIME", "topic",
                 "myTopic-myPartitionGroupId"))));
 
     Assert.assertTrue(exportedPrometheusMetrics.contains(
         PromMetric.withNameAndLabels("pinot_server_lastRealtimeSegmentCreationWaitTimeSeconds_Value",
-            List.of("partition", "myClientId", "table", "myTable", "tableType", "REALTIME", "topic",
+            List.of("partition", "myCLIENT_ID", "table", "myTable", "tableType", "REALTIME", "topic",
                 "myTopic-myPartitionGroupId"))));
 
     Assert.assertTrue(exportedPrometheusMetrics.contains(
         PromMetric.withNameAndLabels("pinot_server_lastRealtimeSegmentInitialConsumptionDurationSeconds_Value",
-            List.of("partition", "myClientId", "table", "myTable", "tableType", "REALTIME", "topic",
+            List.of("partition", "myCLIENT_ID", "table", "myTable", "tableType", "REALTIME", "topic",
                 "myTopic-myPartitionGroupId"))));
 
     Assert.assertTrue(exportedPrometheusMetrics.contains(
         PromMetric.withNameAndLabels("pinot_server_lastRealtimeSegmentCatchupDurationSeconds_Value",
-            List.of("partition", "myClientId", "table", "myTable", "tableType", "REALTIME", "topic",
+            List.of("partition", "myCLIENT_ID", "table", "myTable", "tableType", "REALTIME", "topic",
                 "myTopic-myPartitionGroupId"))));
   }
 
@@ -596,6 +533,45 @@ public class ServerMetricsTest {
     }
     reader.close();
     return exportedPromMetrics;
+  }
+
+  private void assertTimerExportedCorrectly(String exportedTimerPrefix)
+      throws IOException, URISyntaxException {
+    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    for (String meterType : TIMER_TYPES) {
+      Assert.assertTrue(promMetrics.contains(PromMetric.withName(exportedTimerPrefix + "_" + meterType)));
+    }
+  }
+
+  private void assertTimerExportedCorrectly(String exportedTimerPrefix, List<String> labels)
+      throws IOException, URISyntaxException {
+    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    for (String meterType : METER_TYPES) {
+      Assert.assertTrue(
+          promMetrics.contains(PromMetric.withNameAndLabels(exportedTimerPrefix + "_" + meterType, labels)));
+    }
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterPrefix)
+      throws IOException, URISyntaxException {
+    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    for (String meterType : METER_TYPES) {
+      Assert.assertTrue(promMetrics.contains(PromMetric.withName(exportedMeterPrefix + "_" + meterType)));
+    }
+  }
+
+  private void assertMeterExportedCorrectly(String exportedMeterPrefix, List<String> labels)
+      throws IOException, URISyntaxException {
+    List<PromMetric> promMetrics = parseExportedPromMetrics(getExportedPromMetrics().getResponse());
+    for (String meterType : METER_TYPES) {
+      Assert.assertTrue(
+          promMetrics.contains(PromMetric.withNameAndLabels(exportedMeterPrefix + "_" + meterType, labels)));
+    }
+  }
+
+  private SimpleHttpResponse getExportedPromMetrics()
+      throws IOException, URISyntaxException {
+    return _httpClient.sendGetRequest(new URI("http://localhost:9021/metrics"));
   }
 
   public static class PromMetric {
