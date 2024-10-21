@@ -25,18 +25,24 @@ import org.apache.pinot.segment.local.io.writer.impl.FixedBitMVForwardIndexWrite
 import org.apache.pinot.segment.spi.V1Constants;
 import org.apache.pinot.segment.spi.index.creator.ForwardIndexCreator;
 import org.apache.pinot.spi.data.FieldSpec.DataType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
  * Forward index creator for dictionary-encoded multi-value column.
  */
 public class MultiValueUnsortedForwardIndexCreator implements ForwardIndexCreator {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(MultiValueUnsortedForwardIndexCreator.class);
   private final FixedBitMVForwardIndexWriter _writer;
 
   public MultiValueUnsortedForwardIndexCreator(File outputDir, String column, int cardinality, int numDocs,
       int totalNumValues)
       throws Exception {
     File indexFile = new File(outputDir, column + V1Constants.Indexes.UNSORTED_MV_FORWARD_INDEX_FILE_EXTENSION);
+    LOGGER.info("In MultiValueUnsortedForwardIndexCreator, file: {}, column: {}, cardinality: {}", indexFile.getName(),
+        column, cardinality);
     _writer = new FixedBitMVForwardIndexWriter(indexFile, numDocs, totalNumValues,
         PinotDataBitSet.getNumBitsPerValue(cardinality - 1));
   }

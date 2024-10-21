@@ -27,6 +27,8 @@ import org.apache.pinot.segment.local.io.util.FixedBitIntReaderWriter;
 import org.apache.pinot.segment.local.io.util.FixedByteValueReaderWriter;
 import org.apache.pinot.segment.local.io.util.PinotDataBitSet;
 import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 
 /**
@@ -51,6 +53,7 @@ import org.apache.pinot.segment.spi.memory.PinotDataBuffer;
  * bitmap to find the right offset in the raw data section
  */
 public class FixedBitMVForwardIndexWriter implements Closeable {
+  private static final Logger LOGGER = LoggerFactory.getLogger(FixedBitMVForwardIndexWriter.class);
   private static final int SIZE_OF_INT = 4;
   private static final int NUM_COLS_IN_HEADER = 1;
   private static final int PREFERRED_NUM_VALUES_PER_CHUNK = 2048;
@@ -76,16 +79,26 @@ public class FixedBitMVForwardIndexWriter implements Closeable {
 
   public FixedBitMVForwardIndexWriter(File file, int numDocs, int totalNumValues, int numBitsPerValue)
       throws IOException {
-    float averageValuesPerDoc = totalNumValues / numDocs;
+    LOGGER.info(
+        "Instantiating FixedBitMVForwardIndexWriter, file: {}, numDocs: {}, totalNumValues: {}, numBitsPerValue: {}",
+        file.getName(), numDocs, totalNumValues, numBitsPerValue);
+
+    numDocs = Math.max(1, numDocs);
+    float averageValuesPerDoc = Math.max(1, totalNumValues / numDocs);
+
+    LOGGER.info("file: {}, averageValuesPerDoc: {}", file.getName(), averageValuesPerDoc);
+
     _docsPerChunk = (int) (Math.ceil(PREFERRED_NUM_VALUES_PER_CHUNK / averageValuesPerDoc));
+
+    LOGGER.info("file: {}, docPerChunk: {}", file.getName(), _docsPerChunk);
+
     _numChunks = (numDocs + _docsPerChunk - 1) / _docsPerChunk;
     _chunkOffsetHeaderSize = _numChunks * SIZE_OF_INT * NUM_COLS_IN_HEADER;
     _bitsetSize = (totalNumValues + 7) / 8;
     _rawDataSize = ((long) totalNumValues * numBitsPerValue + 7) / 8;
     _totalSize = _chunkOffsetHeaderSize + _bitsetSize + _rawDataSize;
-    Preconditions
-        .checkState(_totalSize > 0 && _totalSize < Integer.MAX_VALUE, "Total size can not exceed 2GB for file: ",
-            file.toString());
+    Preconditions.checkState(_totalSize > 0 && _totalSize < Integer.MAX_VALUE,
+        "Total size can not exceed 2GB for file: ", file.toString());
     // Backward-compatible: index file is always big-endian
     _indexDataBuffer =
         PinotDataBuffer.mapFile(file, false, 0, _totalSize, ByteOrder.BIG_ENDIAN, getClass().getSimpleName());
