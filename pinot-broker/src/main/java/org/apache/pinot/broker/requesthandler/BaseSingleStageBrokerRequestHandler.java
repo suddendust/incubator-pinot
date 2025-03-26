@@ -934,7 +934,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
-    List<String> rowFilters = List.of("ArrTime = 1701");
+    List<String> rowFilters = authorizationResult.getRowFilters();
 
     if (rowFilters != null && !rowFilters.isEmpty()) {
       // Combine row filters into a single AND expression
@@ -979,6 +979,26 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
+
+    List<String> visibleColumns = authorizationResult.getVisibleColumns();
+    if (visibleColumns != null && !visibleColumns.isEmpty()) {
+      pinotQuery = serverPinotQuery;
+      List<Expression> selectList = pinotQuery.getSelectList();
+      List<Expression> filteredSelectList = new ArrayList<>();
+      for (Expression expression : selectList) {
+        if (expression.getType() == ExpressionType.IDENTIFIER) {
+          String columnName = expression.getIdentifier().getName();
+          if (visibleColumns.contains(columnName)) {
+            filteredSelectList.add(expression);
+          }
+        } else {
+          // Keep non-identifier expressions (e.g., functions, literals)
+          filteredSelectList.add(expression);
+        }
+      }
+      pinotQuery.setSelectList(filteredSelectList);
+    }
+
 
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);

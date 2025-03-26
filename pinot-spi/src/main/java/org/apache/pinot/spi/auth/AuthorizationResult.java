@@ -45,4 +45,12 @@ public interface AuthorizationResult {
   default List<String> getRowFilters() {
     return null;
   }
+
+  default List<String> getVisibleColumns() {
+    return List.of("AirlineID");
+  }
+
+  default List<String> getMaskedColumns() {
+    return List.of();
+  }
 }
