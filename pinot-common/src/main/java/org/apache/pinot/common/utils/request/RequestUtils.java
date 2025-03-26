@@ -475,6 +475,36 @@ public class RequestUtils {
     return getLiteralString(literal);
   }
 
+  public static Expression getAndExpression(Expression left, Expression right) {
+    Function andFunction = new Function();
+    andFunction.setOperator("AND");
+    andFunction.setOperands(Arrays.asList(left, right));
+    Expression andExpression = new Expression();
+    andExpression.setType(ExpressionType.FUNCTION);
+    andExpression.setFunctionCall(andFunction);
+    return andExpression;
+  }
+
+  /**
+   * Creates an EQUALS expression for the given column and value.
+   *
+   * @param column The column name.
+   * @param value The value to compare.
+   * @return The EQUALS expression.
+   */
+  public static Expression getEqualsExpression(String column, String value) {
+    Function equalsFunction = new Function();
+    equalsFunction.setOperator("EQUALS");
+    equalsFunction.setOperands(Arrays.asList(
+        getIdentifierExpression(column),
+        getLiteralExpression(value)
+    ));
+    Expression equalsExpression = new Expression();
+    equalsExpression.setType(ExpressionType.FUNCTION);
+    equalsExpression.setFunctionCall(equalsFunction);
+    return equalsExpression;
+  }
+
   public static Function getFunction(String canonicalName, List<Expression> operands) {
     Function function = new Function(canonicalName);
     function.setOperands(operands);

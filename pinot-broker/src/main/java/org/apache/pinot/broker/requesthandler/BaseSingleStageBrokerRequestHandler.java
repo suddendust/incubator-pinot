@@ -24,6 +24,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -933,6 +934,33 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
+    List<String> rowFilters = List.of("ArrTime = 1701");
+
+    if (rowFilters != null && !rowFilters.isEmpty()) {
+      // Combine row filters into a single AND expression
+      Expression combinedRowFilter = null;
+      for (String rowFilter : rowFilters) {
+        // Assuming rowFilter is in the format "column=value"
+        String[] parts = rowFilter.split("=");
+        String column = parts[0].trim();
+        String value = parts[1].trim();
+        Expression rowFilterExpression = RequestUtils.getEqualsExpression(column, value);
+        if (combinedRowFilter == null) {
+          combinedRowFilter = rowFilterExpression;
+        } else {
+          combinedRowFilter = RequestUtils.getAndExpression(combinedRowFilter, rowFilterExpression);
+        }
+      }
+
+      // Add the combined row filters to the existing WHERE clause
+      pinotQuery = serverPinotQuery;
+      if (pinotQuery.getFilterExpression() != null) {
+        pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(), combinedRowFilter));
+      } else {
+        pinotQuery.setFilterExpression(combinedRowFilter);
+      }
+    }
+
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -970,6 +998,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
+  }
+
+  public static Expression getAndExpression(Expression left, Expression right) {
+    Function andFunction = new Function();
+    andFunction.setOperator("AND");
+    andFunction.setOperands(Arrays.asList(left, right));
+    Expression andExpression = new Expression();
+    andExpression.setFunctionCall(andFunction);
+    return andExpression;
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
