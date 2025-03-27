@@ -51,6 +51,6 @@ public interface AuthorizationResult {
   }
 
   default List<String> getMaskedColumns() {
-    return List.of();
+    return List.of("ArrDelay");
   }
 }

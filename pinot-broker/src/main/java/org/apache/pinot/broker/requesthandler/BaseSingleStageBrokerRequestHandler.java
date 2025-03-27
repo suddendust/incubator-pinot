@@ -981,6 +981,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     List<String> visibleColumns = authorizationResult.getVisibleColumns();
+    List<String> maskedColumns = authorizationResult.getMaskedColumns();
     if (visibleColumns != null && !visibleColumns.isEmpty()) {
       pinotQuery = serverPinotQuery;
       List<Expression> selectList = pinotQuery.getSelectList();
@@ -989,7 +990,13 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         if (expression.getType() == ExpressionType.IDENTIFIER) {
           String columnName = expression.getIdentifier().getName();
           if (visibleColumns.contains(columnName)) {
-            filteredSelectList.add(expression);
+            if (maskedColumns.contains(columnName)) {
+              // Obfuscate the value for masked columns
+              Expression obfuscatedExpression = RequestUtils.getLiteralExpression("****");
+              filteredSelectList.add(obfuscatedExpression);
+            } else {
+              filteredSelectList.add(expression);
+            }
           }
         } else {
           // Keep non-identifier expressions (e.g., functions, literals)
