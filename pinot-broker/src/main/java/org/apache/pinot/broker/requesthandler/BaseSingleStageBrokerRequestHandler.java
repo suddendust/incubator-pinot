@@ -936,6 +936,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     List<String> rowFilters = authorizationResult.getRowFilters();
 
+    String tableRowFilter = "";
+
+
     if (rowFilters != null && !rowFilters.isEmpty()) {
       // Combine row filters into a single AND expression
       Expression combinedRowFilter = null;
