@@ -47,10 +47,10 @@ public interface AuthorizationResult {
   }
 
   default List<String> getVisibleColumns() {
-    return List.of("AirlineID");
+    return List.of("");
   }
 
   default List<String> getMaskedColumns() {
-    return List.of("ArrDelay");
+    return List.of("");
   }
 }
