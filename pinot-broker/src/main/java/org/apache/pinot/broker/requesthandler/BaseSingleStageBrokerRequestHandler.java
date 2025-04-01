@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -769,6 +770,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
             requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
+
       } finally {
         onQueryFinish(requestId);
         LOGGER.debug("Remove track of running query: {}", requestId);
@@ -778,6 +780,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           processBrokerRequest(requestId, brokerRequest, serverBrokerRequest, offlineBrokerRequest, offlineRoutingTable,
               realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
+
+    List<Integer> columnIndicesToMask = List.of(0);
+
+    ResultTable resultTable = brokerResponse.getResultTable();
+
+    for (Object[] row : resultTable.getRows()) {
+      for (int columnIndex : columnIndicesToMask) {
+        row[columnIndex] = "****";
+      }
+    }
+
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
     for (QueryProcessingException errorMsg : errorMsgs) {
@@ -924,15 +937,17 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
-    List<String> rowFilters = authorizationResult.getRowFilters();
-
-    String tableRowFilter = "ArrDelay < 0";
+    String tableRowFilter = authorizationResult.getRowFilters();
 
     PinotQuery pinotQueryWithRowFilters =
         CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilter);
 
-    pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
-        pinotQueryWithRowFilters.getFilterExpression()));
+    if (pinotQuery.isSetFilterExpression()) {
+      pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
+          pinotQueryWithRowFilters.getFilterExpression()));
+    } else {
+      pinotQuery.setFilterExpression(pinotQueryWithRowFilters.getFilterExpression());
+    }
 
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
@@ -952,35 +967,26 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
-    List<String> visibleColumns = List.of("");
-    pinotQuery.getSelectList()
+    List<String> visibleColumns = Arrays.asList(authorizationResult.getVisibleColumns().split(","));
+    List<String> maskedColumns = Arrays.asList(authorizationResult.getMaskedColumns().split(","));
 
-
-//    List<String> visibleColumns = authorizationResult.getVisibleColumns();
-//    List<String> maskedColumns = authorizationResult.getMaskedColumns();
-//    if (visibleColumns != null && !visibleColumns.isEmpty()) {
-//      pinotQuery = serverPinotQuery;
-//      List<Expression> selectList = pinotQuery.getSelectList();
-//      List<Expression> filteredSelectList = new ArrayList<>();
-//      for (Expression expression : selectList) {
-//        if (expression.getType() == ExpressionType.IDENTIFIER) {
-//          String columnName = expression.getIdentifier().getName();
-//          if (visibleColumns.contains(columnName)) {
-//            if (maskedColumns.contains(columnName)) {
-//              // Obfuscate the value for masked columns
-//              Expression obfuscatedExpression = RequestUtils.getLiteralExpression("****");
-//              filteredSelectList.add(obfuscatedExpression);
-//            } else {
-//              filteredSelectList.add(expression);
-//            }
-//          }
-//        } else {
-//          // Keep non-identifier expressions (e.g., functions, literals)
-//          filteredSelectList.add(expression);
-//        }
-//      }
-//      pinotQuery.setSelectList(filteredSelectList);
-//    }
+    if (!visibleColumns.isEmpty()) {
+      pinotQuery = serverPinotQuery;
+      List<Expression> selectList = pinotQuery.getSelectList();
+      List<Expression> filteredSelectList = new ArrayList<>();
+      for (Expression expression : selectList) {
+        if (expression.getType() == ExpressionType.IDENTIFIER) {
+          String columnName = expression.getIdentifier().getName();
+          if (visibleColumns.contains(columnName)) {
+            filteredSelectList.add(expression);
+          }
+        } else {
+          // Keep non-identifier expressions (e.g., functions, literals)
+          filteredSelectList.add(expression);
+        }
+      }
+      pinotQuery.setSelectList(filteredSelectList);
+    }
 
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);

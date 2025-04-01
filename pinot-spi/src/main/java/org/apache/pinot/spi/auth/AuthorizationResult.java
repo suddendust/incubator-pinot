@@ -42,15 +42,15 @@ public interface AuthorizationResult {
    */
   String getFailureMessage();
 
-  default List<String> getRowFilters() {
-    return null;
+  default String getRowFilters() {
+    return "ArrDelay < 0";
   }
 
-  default List<String> getVisibleColumns() {
-    return List.of("");
+  default String getVisibleColumns() {
+    return "ActualElapsedTime,AirTime,ArrDelay";
   }
 
-  default List<String> getMaskedColumns() {
-    return List.of("");
+  default String getMaskedColumns() {
+    return "AirlineID";
   }
 }
