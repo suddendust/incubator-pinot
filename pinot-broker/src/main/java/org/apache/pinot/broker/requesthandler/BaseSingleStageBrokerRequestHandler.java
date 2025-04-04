@@ -781,15 +781,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
 
-    List<Integer> columnIndicesToMask = List.of(0);
-
-    ResultTable resultTable = brokerResponse.getResultTable();
-
-    for (Object[] row : resultTable.getRows()) {
-      for (int columnIndex : columnIndicesToMask) {
-        row[columnIndex] = "****";
-      }
-    }
+    BrokerResponseObfuscatorUtils.obfuscate(brokerResponse, pinotQuery.isExplain(), authorizationResult.getRowFilters(), authorizationResult.getMaskedColumns());
 
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -937,10 +929,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
-    String tableRowFilter = authorizationResult.getRowFilters();
+    Set<String> tableRowFilters = authorizationResult.getRowFilters();
+    StringBuilder tableRowFilterBuilder = new StringBuilder();
+    int i = 0;
+
+    for (String tableRowFilter : tableRowFilters) {
+      tableRowFilterBuilder.append(tableRowFilter);
+      if (i++ < tableRowFilters.size() - 1) {
+        tableRowFilterBuilder.append(" AND ");
+      }
+    }
 
     PinotQuery pinotQueryWithRowFilters =
-        CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilter);
+        CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilterBuilder);
 
     if (pinotQuery.isSetFilterExpression()) {
       pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
@@ -967,8 +968,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
-    List<String> visibleColumns = Arrays.asList(authorizationResult.getVisibleColumns().split(","));
-    List<String> maskedColumns = Arrays.asList(authorizationResult.getMaskedColumns().split(","));
+    Set<String> visibleColumns = authorizationResult.getVisibleColumns();
 
     if (!visibleColumns.isEmpty()) {
       pinotQuery = serverPinotQuery;

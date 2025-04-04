@@ -19,6 +19,7 @@
 package org.apache.pinot.spi.auth;
 
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -42,15 +43,15 @@ public interface AuthorizationResult {
    */
   String getFailureMessage();
 
-  default String getRowFilters() {
-    return "ArrDelay < 0";
+  default Set<String> getRowFilters() {
+    return Set.of("ArrDelay < 0");
   }
 
-  default String getVisibleColumns() {
-    return "ActualElapsedTime,AirTime,ArrDelay";
+  default Set<String> getVisibleColumns() {
+    return Set.of("ActualElapsedTime", "AirTime", "ArrDelay");
   }
 
-  default String getMaskedColumns() {
-    return "AirlineID";
+  default Set<String> getMaskedColumns() {
+    return Set.of("ArrDelay");
   }
 }
