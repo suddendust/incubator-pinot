@@ -12,6 +12,11 @@ public class BrokerResponseObfuscatorUtils {
     if (isExplainPlan) {
       List<Object[]> rows = brokerResponse.getResultTable().getRows();
       for (Object[] row : rows) {
+        for (String rowFilter : rowFilters) {
+          if (((String) row[0]).contains(rowFilter)) {
+            row[0] = ((String) row[0]).replace(rowFilter, "****");
+          }
+        }
       }
     } else {
       List<Integer> colIndexesToObfuscate = new ArrayList<>();
@@ -25,7 +30,7 @@ public class BrokerResponseObfuscatorUtils {
       List<Object[]> rows = brokerResponse.getResultTable().getRows();
       for (Object[] row : rows) {
         for (int colIndex : colIndexesToObfuscate) {
-          row[colIndex] = "OBFUSCATED";
+          row[colIndex] = "****";
         }
       }
     }

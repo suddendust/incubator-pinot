@@ -49,6 +49,7 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -75,6 +76,7 @@ import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
+import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -126,8 +128,7 @@ public class QueryEnvironment {
     CalciteSchema rootSchema = CalciteSchema.createRootSchema(false, false, database, _catalog);
     Properties connectionConfigProperties = new Properties();
     connectionConfigProperties.setProperty(CalciteConnectionProperty.CASE_SENSITIVE.camelName(), Boolean.toString(
-        config.getTableCache() == null
-            ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
+        config.getTableCache() == null ? !CommonConstants.Helix.DEFAULT_ENABLE_CASE_INSENSITIVE
             : !config.getTableCache().isIgnoreCase()));
     CalciteConnectionConfig connectionConfig = new CalciteConnectionConfigImpl(connectionConfigProperties);
     _config = Frameworks.newConfigBuilder().traitDefs().operatorTable(PinotOperatorTable.instance())
@@ -137,11 +138,7 @@ public class QueryEnvironment {
   }
 
   public QueryEnvironment(String database, TableCache tableCache, @Nullable WorkerManager workerManager) {
-    this(configBuilder()
-        .database(database)
-        .tableCache(tableCache)
-        .workerManager(workerManager)
-        .build());
+    this(configBuilder().database(database).tableCache(tableCache).workerManager(workerManager).build());
   }
 
   /**
@@ -172,8 +169,8 @@ public class QueryEnvironment {
 
   @Nullable
   private WorkerManager getWorkerManager(SqlNodeAndOptions sqlNodeAndOptions) {
-    String inferPartitionHint = sqlNodeAndOptions.getOptions()
-        .get(CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT);
+    String inferPartitionHint =
+        sqlNodeAndOptions.getOptions().get(CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT);
     WorkerManager workerManager = _envConfig.getWorkerManager();
 
     if (inferPartitionHint == null) {
@@ -181,16 +178,16 @@ public class QueryEnvironment {
     }
     switch (inferPartitionHint.toLowerCase()) {
       case "true":
-        Objects.requireNonNull(workerManager, "WorkerManager is required in order to infer partition hint. "
-            + "Please enable it using broker config"
-            + CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER + "=true");
+        Objects.requireNonNull(workerManager,
+            "WorkerManager is required in order to infer partition hint. " + "Please enable it using broker config"
+                + CommonConstants.Broker.CONFIG_OF_ENABLE_PARTITION_METADATA_MANAGER + "=true");
         return workerManager;
       case "false":
         return null;
       default:
-        throw new RuntimeException("Invalid value for query option '"
-            + CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT + "': "
-            + inferPartitionHint);
+        throw new RuntimeException(
+            "Invalid value for query option '" + CommonConstants.Broker.Request.QueryOptionKey.INFER_PARTITION_HINT
+                + "': " + inferPartitionHint);
     }
   }
 
@@ -230,13 +227,14 @@ public class QueryEnvironment {
     PlannerContext plannerContext = null;
     try {
       plannerContext = getPlannerContext(sqlNodeAndOptions);
-
       SqlNode sqlNode = sqlNodeAndOptions.getSqlNode();
       SqlNode queryNode;
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         queryNode = ((SqlExplain) sqlNode).getExplicandum();
       } else {
-        queryNode = sqlNode;
+        ((SqlSelect) sqlNode).setWhere(((SqlSelect) (CalciteSqlParser.compileToSqlNodeAndOptions(
+            "SELECT * from airlineStats b WHERE b.ArrDelay < 0").getSqlNode())).getWhere());
+        queryNode = sqlNodeAndOptions.getSqlNode();
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
       return new CompiledQuery(_envConfig.getDatabase(), sqlQuery, relRoot, plannerContext, sqlNodeAndOptions);
@@ -424,8 +422,8 @@ public class QueryEnvironment {
 
   private DispatchableSubPlan toDispatchableSubPlan(RelRoot relRoot, PlannerContext plannerContext, long requestId,
       @Nullable TransformationTracker.Builder<PlanNode, RelNode> tracker) {
-    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker,
-        _envConfig.getTableCache(), useSpools(plannerContext.getOptions()));
+    SubPlan plan = PinotLogicalQueryPlanner.makePlan(relRoot, tracker, _envConfig.getTableCache(),
+        useSpools(plannerContext.getOptions()));
     PinotDispatchPlanner pinotDispatchPlanner =
         new PinotDispatchPlanner(plannerContext, _envConfig.getWorkerManager(), requestId, _envConfig.getTableCache());
     return pinotDispatchPlanner.createDispatchableSubPlan(plan);
@@ -618,11 +616,12 @@ public class QueryEnvironment {
             DispatchableSubPlan dispatchableSubPlan =
                 toDispatchableSubPlan(_relRoot, _plannerContext, requestId, nodeTracker);
 
-            AskingServerStageExplainer serversExplainer = new AskingServerStageExplainer(
-                onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
+            AskingServerStageExplainer serversExplainer =
+                new AskingServerStageExplainer(onServerExplainer, explainPlanVerbose, RelBuilder.create(_config));
 
-            RelNode explainedNode = MultiStageExplainAskingServersUtils.modifyRel(_relRoot.rel,
-                dispatchableSubPlan.getQueryStages(), nodeTracker, serversExplainer);
+            RelNode explainedNode =
+                MultiStageExplainAskingServersUtils.modifyRel(_relRoot.rel, dispatchableSubPlan.getQueryStages(),
+                    nodeTracker, serversExplainer);
 
             return getQueryPlannerResult(_plannerContext, dispatchableSubPlan,
                 PlannerUtils.explainPlan(explainedNode, format, level), dispatchableSubPlan.getTableNames());

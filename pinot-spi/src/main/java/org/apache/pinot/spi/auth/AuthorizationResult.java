@@ -44,7 +44,7 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("ArrDelay < 0");
+    return Set.of("ArrDelay < '0'");
   }
 
   default Set<String> getVisibleColumns() {
@@ -52,6 +52,6 @@ public interface AuthorizationResult {
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("ArrDelay");
+    return Set.of("AirTime");
   }
 }

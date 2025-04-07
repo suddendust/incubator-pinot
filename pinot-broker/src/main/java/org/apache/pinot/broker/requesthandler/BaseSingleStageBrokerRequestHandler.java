@@ -770,7 +770,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
             offlineRoutingTable, realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats,
             requestContext);
         brokerResponse.setClientRequestId(clientRequestId);
-
       } finally {
         onQueryFinish(requestId);
         LOGGER.debug("Remove track of running query: {}", requestId);
@@ -781,7 +780,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
 
-    BrokerResponseObfuscatorUtils.obfuscate(brokerResponse, pinotQuery.isExplain(), authorizationResult.getRowFilters(), authorizationResult.getMaskedColumns());
+    BrokerResponseObfuscatorUtils.obfuscate(brokerResponse, pinotQuery.isExplain(), authorizationResult.getRowFilters(),
+        authorizationResult.getMaskedColumns());
 
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -979,6 +979,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           String columnName = expression.getIdentifier().getName();
           if (visibleColumns.contains(columnName)) {
             filteredSelectList.add(expression);
+          }
+        } else if (expression.getType() == ExpressionType.FUNCTION) {
+          if (expression.getFunctionCall().getOperator().equals("AS")) {
+            Expression originalColName = expression.getFunctionCall().getOperands().get(0);
+            if (originalColName.getType() == ExpressionType.IDENTIFIER) {
+              String columnName = originalColName.getIdentifier().getName();
+              if (visibleColumns.contains(columnName)) {
+                filteredSelectList.add(expression);
+              }
+            }
           }
         } else {
           // Keep non-identifier expressions (e.g., functions, literals)
