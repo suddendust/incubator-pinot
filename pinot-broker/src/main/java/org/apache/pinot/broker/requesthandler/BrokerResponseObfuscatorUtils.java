@@ -6,6 +6,7 @@ import java.util.Set;
 import org.apache.pinot.common.response.BrokerResponse;
 
 
+//1. Create an internal UDF per data type.
 public class BrokerResponseObfuscatorUtils {
   public static BrokerResponse obfuscate(BrokerResponse brokerResponse, boolean isExplainPlan, Set<String> rowFilters,
       Set<String> columnsToObfuscate) {

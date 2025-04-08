@@ -44,9 +44,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
+import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
+import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
@@ -232,8 +234,32 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         queryNode = ((SqlExplain) sqlNode).getExplicandum();
       } else {
-        ((SqlSelect) sqlNode).setWhere(((SqlSelect) (CalciteSqlParser.compileToSqlNodeAndOptions(
-            "SELECT * from airlineStats b WHERE b.ArrDelay < 0").getSqlNode())).getWhere());
+        Map<String, String> rowFilters = Map.of("airlineStats", "ArrDelay < 0");
+
+        if (sqlQuery.contains("JOIN")) {
+
+
+        } else {
+          String query = "SELECT * from " + getTableNamesForQuery(sqlQuery) + " WHERE " + rowFilters.get("airlineStats");
+        }
+
+        String firstTableName =
+            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getLeft()).getOperandList().get(0).toString();
+        String firstTableAlias =
+            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getLeft()).getOperandList().get(1).toString();
+
+        String secondTableName =
+            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getRight()).getOperandList().get(0).toString();
+        String secondTableAlias =
+            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getRight()).getOperandList().get(1).toString();
+
+        String query = "SELECT * from " + firstTableName + " " + firstTableAlias + " WHERE " + firstTableAlias + "."
+            + rowFilters.get(firstTableName) + " AND " + secondTableAlias + "." + rowFilters.get(secondTableName);
+
+        if (sqlQuery.contains("JOIN")) {
+          ((SqlSelect) sqlNode).setWhere(
+              ((SqlSelect) (CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode())).getWhere());
+        }
         queryNode = sqlNodeAndOptions.getSqlNode();
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);

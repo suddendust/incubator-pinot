@@ -45,6 +45,12 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
+import org.apache.calcite.sql.SqlCall;
+import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
+import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -940,15 +946,47 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
-    PinotQuery pinotQueryWithRowFilters =
-        CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilterBuilder);
 
-    if (pinotQuery.isSetFilterExpression()) {
-      pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
-          pinotQueryWithRowFilters.getFilterExpression()));
-    } else {
-      pinotQuery.setFilterExpression(pinotQueryWithRowFilters.getFilterExpression());
+    // Parse the original SQL using CalciteSqlParser
+    SqlNode originalSqlNode = sqlNodeAndOptions.getSqlNode();
+
+    // Parse filter expressions and create a combined filter
+    SqlNode filterNode = null;
+    for (String filterExpr : authorizationResult.getRowFilters()) {
+      // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
+      String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
+      SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
+      SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
+
+      // Extract the WHERE clause from the parsed query
+      SqlSelect select = (SqlSelect) parsedQuery;
+      SqlNode parsedFilter = select.getWhere();
+
+      if (filterNode == null) {
+        filterNode = parsedFilter;
+      } else {
+        filterNode = SqlStdOperatorTable.AND.createCall(
+            SqlParserPos.ZERO, filterNode, parsedFilter);
+      }
     }
+
+    MyCustomVisitor myCustomVisitor = new MyCustomVisitor(filterNode);
+    sqlNodeAndOptions.getSqlNode().accept(myCustomVisitor);
+
+    //shuttle pattern: Go and visit the parse tree. ScanNode on a filter node. For SSE: ScanNode, Filter and aggregation node
+    //1. Create a filter expression in Calcite internal representation.
+    //2. Use visitor patter to get filter + scan node sub-plan (for the original query once it's compiled).
+    //3. Add filter expression to the filter node.
+
+//    PinotQuery pinotQueryWithRowFilters =
+//        CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilterBuilder);
+//
+//    if (pinotQuery.isSetFilterExpression()) {
+//      pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
+//          pinotQueryWithRowFilters.getFilterExpression()));
+//    } else {
+//      pinotQuery.setFilterExpression(pinotQueryWithRowFilters.getFilterExpression());
+//    }
 
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
@@ -967,6 +1005,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
+
+    //1. Check the project nodes of the original query.
+    //2. Check the rex expressions and delete.
 
     Set<String> visibleColumns = authorizationResult.getVisibleColumns();
 
