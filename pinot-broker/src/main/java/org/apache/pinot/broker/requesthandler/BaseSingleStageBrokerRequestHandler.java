@@ -29,7 +29,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -45,12 +44,10 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
-import org.apache.calcite.sql.SqlCall;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.parser.SqlParserPos;
-import org.apache.calcite.sql.util.SqlShuttle;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -847,6 +844,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl) {
     PinotQuery pinotQuery;
     try {
+
+      sqlNodeAndOptions.getSqlNode()
+          .accept(new RemoveHiddenColumnsVisitor(Set.of("ActualElapsedTime", "AirTime", "ArrDelay")));
+
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
@@ -935,20 +936,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
-    Set<String> tableRowFilters = authorizationResult.getRowFilters();
-    StringBuilder tableRowFilterBuilder = new StringBuilder();
-    int i = 0;
-
-    for (String tableRowFilter : tableRowFilters) {
-      tableRowFilterBuilder.append(tableRowFilter);
-      if (i++ < tableRowFilters.size() - 1) {
-        tableRowFilterBuilder.append(" AND ");
-      }
-    }
-
-
     // Parse the original SQL using CalciteSqlParser
-    SqlNode originalSqlNode = sqlNodeAndOptions.getSqlNode();
 
     // Parse filter expressions and create a combined filter
     SqlNode filterNode = null;
@@ -965,15 +953,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       if (filterNode == null) {
         filterNode = parsedFilter;
       } else {
-        filterNode = SqlStdOperatorTable.AND.createCall(
-            SqlParserPos.ZERO, filterNode, parsedFilter);
+        filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
       }
     }
 
-    MyCustomVisitor myCustomVisitor = new MyCustomVisitor(filterNode);
-    sqlNodeAndOptions.getSqlNode().accept(myCustomVisitor);
+    ModifyFilterClauseVisitor modifyFilterClauseVisitor = new ModifyFilterClauseVisitor(filterNode);
+    sqlNodeAndOptions.getSqlNode().accept(modifyFilterClauseVisitor);
 
-    //shuttle pattern: Go and visit the parse tree. ScanNode on a filter node. For SSE: ScanNode, Filter and aggregation node
+    //shuttle pattern: Go and visit the parse tree. ScanNode on a filter node. For SSE: ScanNode, Filter and
+    // aggregation node
     //1. Create a filter expression in Calcite internal representation.
     //2. Use visitor patter to get filter + scan node sub-plan (for the original query once it's compiled).
     //3. Add filter expression to the filter node.
@@ -1009,36 +997,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     //1. Check the project nodes of the original query.
     //2. Check the rex expressions and delete.
 
-    Set<String> visibleColumns = authorizationResult.getVisibleColumns();
-
-    if (!visibleColumns.isEmpty()) {
-      pinotQuery = serverPinotQuery;
-      List<Expression> selectList = pinotQuery.getSelectList();
-      List<Expression> filteredSelectList = new ArrayList<>();
-      for (Expression expression : selectList) {
-        if (expression.getType() == ExpressionType.IDENTIFIER) {
-          String columnName = expression.getIdentifier().getName();
-          if (visibleColumns.contains(columnName)) {
-            filteredSelectList.add(expression);
-          }
-        } else if (expression.getType() == ExpressionType.FUNCTION) {
-          if (expression.getFunctionCall().getOperator().equals("AS")) {
-            Expression originalColName = expression.getFunctionCall().getOperands().get(0);
-            if (originalColName.getType() == ExpressionType.IDENTIFIER) {
-              String columnName = originalColName.getIdentifier().getName();
-              if (visibleColumns.contains(columnName)) {
-                filteredSelectList.add(expression);
-              }
-            }
-          }
-        } else {
-          // Keep non-identifier expressions (e.g., functions, literals)
-          filteredSelectList.add(expression);
-        }
-      }
-      pinotQuery.setSelectList(filteredSelectList);
-    }
-
     if (_defaultHllLog2m > 0) {
       handleHLLLog2mOverride(serverPinotQuery, _defaultHllLog2m);
     }
@@ -1057,15 +1015,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     return new CompileResult(pinotQuery, serverPinotQuery, schema, tableName, rawTableName);
-  }
-
-  public static Expression getAndExpression(Expression left, Expression right) {
-    Function andFunction = new Function();
-    andFunction.setOperator("AND");
-    andFunction.setOperands(Arrays.asList(left, right));
-    Expression andExpression = new Expression();
-    andExpression.setFunctionCall(andFunction);
-    return andExpression;
   }
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,

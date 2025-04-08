@@ -3,6 +3,7 @@ package org.apache.pinot.broker.requesthandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import org.apache.pinot.common.function.scalar.VectorFunctions;
 import org.apache.pinot.common.response.BrokerResponse;
 
 

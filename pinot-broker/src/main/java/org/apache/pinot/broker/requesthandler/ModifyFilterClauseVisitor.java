@@ -8,11 +8,10 @@ import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 
 
-public class MyCustomVisitor extends SqlBasicVisitor<SqlNode> {
-
+public class ModifyFilterClauseVisitor extends SqlBasicVisitor<SqlNode> {
   private final SqlNode _filterNode;
 
-  public MyCustomVisitor(SqlNode filterNode) {
+  public ModifyFilterClauseVisitor(SqlNode filterNode) {
     _filterNode = filterNode;
   }
 

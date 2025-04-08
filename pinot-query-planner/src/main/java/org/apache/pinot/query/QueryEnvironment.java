@@ -52,6 +52,8 @@ import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -234,32 +236,31 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         queryNode = ((SqlExplain) sqlNode).getExplicandum();
       } else {
-        Map<String, String> rowFilters = Map.of("airlineStats", "ArrDelay < 0");
 
-        if (sqlQuery.contains("JOIN")) {
+        SqlNode filterNode = null;
+        for (String filterExpr : Set.of("ArrDelay < '0'")) {
+          // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
+          String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
+          SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
+          SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
 
+          // Extract the WHERE clause from the parsed query
+          SqlSelect select = (SqlSelect) parsedQuery;
+          SqlNode parsedFilter = select.getWhere();
 
-        } else {
-          String query = "SELECT * from " + getTableNamesForQuery(sqlQuery) + " WHERE " + rowFilters.get("airlineStats");
+          if (filterNode == null) {
+            filterNode = parsedFilter;
+          } else {
+            filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
+          }
         }
 
-        String firstTableName =
-            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getLeft()).getOperandList().get(0).toString();
-        String firstTableAlias =
-            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getLeft()).getOperandList().get(1).toString();
+        Map<String, SqlNode> filters = Map.of("airlineStats", filterNode);
+        ModifyFilterClauseVisitor multistageModifyFilterClauseVisitor =
+            new ModifyFilterClauseVisitor(filters);
 
-        String secondTableName =
-            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getRight()).getOperandList().get(0).toString();
-        String secondTableAlias =
-            ((SqlBasicCall) ((SqlJoin) ((SqlSelect) sqlNode).getFrom()).getRight()).getOperandList().get(1).toString();
+        sqlNode.accept(multistageModifyFilterClauseVisitor);
 
-        String query = "SELECT * from " + firstTableName + " " + firstTableAlias + " WHERE " + firstTableAlias + "."
-            + rowFilters.get(firstTableName) + " AND " + secondTableAlias + "." + rowFilters.get(secondTableName);
-
-        if (sqlQuery.contains("JOIN")) {
-          ((SqlSelect) sqlNode).setWhere(
-              ((SqlSelect) (CalciteSqlParser.compileToSqlNodeAndOptions(query).getSqlNode())).getWhere());
-        }
         queryNode = sqlNodeAndOptions.getSqlNode();
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
