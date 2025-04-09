@@ -50,7 +50,7 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String reverse(String input) {
-    return StringUtils.reverse(input);
+    return "****";
   }
 
   /**

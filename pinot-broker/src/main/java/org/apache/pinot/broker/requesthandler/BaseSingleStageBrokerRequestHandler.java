@@ -783,8 +783,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
               realtimeBrokerRequest, realtimeRoutingTable, remainingTimeMs, serverStats, requestContext);
     }
 
-    BrokerResponseObfuscatorUtils.obfuscate(brokerResponse, pinotQuery.isExplain(), authorizationResult.getRowFilters(),
-        authorizationResult.getMaskedColumns());
+
+
+//    PinotQuery(dataSource:DataSource(tableName:airlineStats_REALTIME), selectList:[Expression(type:FUNCTION, functionCall:Function(operator:reverse, operands:[Expression(type:IDENTIFIER, identifier:Identifier(name:AirlineID))]))], limit:10, queryOptions:{serverReturnFinalResult=true, timeoutMs=10000})
 
     brokerResponse.setTablesQueried(Set.of(rawTableName));
 
@@ -846,7 +847,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     try {
 
       sqlNodeAndOptions.getSqlNode()
-          .accept(new RemoveHiddenColumnsVisitor(Set.of("ActualElapsedTime", "AirTime", "ArrDelay")));
+          .accept(new ColumnMaskingVisitor(Set.of("AirlineID")));
 
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
