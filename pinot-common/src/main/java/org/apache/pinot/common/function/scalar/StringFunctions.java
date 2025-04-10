@@ -53,6 +53,11 @@ public class StringFunctions {
     return "****";
   }
 
+  @ScalarFunction
+  public static String addInputPrefix(int input) {
+    return "my input is: " + input;
+  }
+
   /**
    * @see String#toLowerCase())
    * @param input

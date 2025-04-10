@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -92,6 +91,7 @@ import org.apache.pinot.core.routing.ServerRouteInfo;
 import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
+import org.apache.pinot.query.ColumnMaskingVisitor;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -847,7 +847,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     try {
 
       sqlNodeAndOptions.getSqlNode()
-          .accept(new ColumnMaskingVisitor(Set.of("AirlineID")));
+          .accept(new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
 
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {

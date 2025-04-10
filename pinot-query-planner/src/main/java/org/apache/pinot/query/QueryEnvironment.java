@@ -236,31 +236,6 @@ public class QueryEnvironment {
       if (sqlNode.getKind().equals(SqlKind.EXPLAIN)) {
         queryNode = ((SqlExplain) sqlNode).getExplicandum();
       } else {
-
-        SqlNode filterNode = null;
-        for (String filterExpr : Set.of("ArrDelay < '0'")) {
-          // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
-          String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
-          SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
-          SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
-
-          // Extract the WHERE clause from the parsed query
-          SqlSelect select = (SqlSelect) parsedQuery;
-          SqlNode parsedFilter = select.getWhere();
-
-          if (filterNode == null) {
-            filterNode = parsedFilter;
-          } else {
-            filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
-          }
-        }
-
-        Map<String, SqlNode> filters = Map.of("airlineStats", filterNode);
-        ModifyFilterClauseVisitor multistageModifyFilterClauseVisitor =
-            new ModifyFilterClauseVisitor(filters);
-
-        sqlNode.accept(multistageModifyFilterClauseVisitor);
-
         queryNode = sqlNodeAndOptions.getSqlNode();
       }
       RelRoot relRoot = compileQuery(queryNode, plannerContext);
@@ -334,6 +309,8 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
+    sqlNode.accept(
+        new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);

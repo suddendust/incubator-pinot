@@ -1,4 +1,4 @@
-package org.apache.pinot.broker.requesthandler;
+package org.apache.pinot.query;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -235,7 +235,7 @@ public class ColumnMaskingVisitor extends SqlShuttle {
   private static class SqlMaskFunction extends org.apache.calcite.sql.SqlFunction {
     public SqlMaskFunction() {
       super(
-          "reverse",                      // Function name
+          "mask",                      // Function name
           SqlKind.OTHER_FUNCTION,      // SQL kind
           null,                        // Return type inference
           null,                        // Operand type inference
