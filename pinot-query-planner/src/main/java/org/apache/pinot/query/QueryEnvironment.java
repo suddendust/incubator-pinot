@@ -329,8 +329,6 @@ public class QueryEnvironment {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
-      validated.accept(
-          new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
       return validated;
     } catch (QueryException e) {
       throw e;

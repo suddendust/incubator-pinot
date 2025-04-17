@@ -22,6 +22,11 @@ import java.util.List;
 import org.apache.calcite.plan.RelOptRule;
 import org.apache.calcite.rel.rules.CoreRules;
 import org.apache.calcite.rel.rules.PruneEmptyRules;
+import org.apache.calcite.sql.SqlFunction;
+import org.apache.calcite.sql.SqlFunctionCategory;
+import org.apache.calcite.sql.SqlKind;
+import org.apache.calcite.sql.type.OperandTypes;
+import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotFilterIntoJoinRule;
 import org.apache.pinot.calcite.rel.rules.PinotFilterJoinRule.PinotJoinConditionPushRule;
 
@@ -58,12 +63,18 @@ public class PinotQueryRuleSets {
       // push project through WINDOW
       CoreRules.PROJECT_WINDOW_TRANSPOSE,
 
+//      SqlFunction maskValFunction = new SqlFunction("maskVal", SqlKind.OTHER_FUNCTION, ReturnTypes.VARCHAR,
+//          // Return type is same as first argument
+//          null, OperandTypes.ANY, // Accept any operand type
+//          SqlFunctionCategory.USER_DEFINED_FUNCTION);
+
       // literal rules
       // TODO: Revisit and see if they can be replaced with
       //     CoreRules.PROJECT_REDUCE_EXPRESSIONS and
       //     CoreRules.FILTER_REDUCE_EXPRESSIONS
       PinotEvaluateLiteralRule.Project.INSTANCE,
       PinotEvaluateLiteralRule.Filter.INSTANCE,
+      PinotMaskColumnRule.Project.INSTANCE,
 
       // sort join rules
       // TODO: evaluate the SORT_JOIN_TRANSPOSE and SORT_JOIN_COPY rules
