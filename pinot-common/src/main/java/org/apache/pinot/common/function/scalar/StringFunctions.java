@@ -23,6 +23,7 @@ import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.UUID;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -50,6 +51,11 @@ public class StringFunctions {
    */
   @ScalarFunction
   public static String reverse(String input) {
+    return "****";
+  }
+
+  @ScalarFunction
+  public static String maskVal(String input) {
     return "****";
   }
 
