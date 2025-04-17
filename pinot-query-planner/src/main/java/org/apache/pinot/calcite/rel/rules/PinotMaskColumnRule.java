@@ -1,21 +1,4 @@
-/**
- * Licensed to the Apache Software Foundation (ASF) under one
- * or more contributor license agreements.  See the NOTICE file
- * distributed with this work for additional information
- * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
- * with the License.  You may obtain a copy of the License at
- *
- *   http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
- */
+/** * Licensed to the Apache Software Foundation (ASF) under one * or more contributor license agreements.  See the NOTICE file * distributed with this work for additional information * regarding copyright ownership.  The ASF licenses this file * to you under the Apache License, Version 2.0 (the * "License"); you may not use this file except in compliance * with the License.  You may obtain a copy of the License at * *   http://www.apache.org/licenses/LICENSE-2.0 * * Unless required by applicable law or agreed to in writing, * software distributed under the License is distributed on an * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY * KIND, either express or implied.  See the License for the * specific language governing permissions and limitations * under the License. */
 package org.apache.pinot.calcite.rel.rules;
 
 import java.util.ArrayList;
@@ -40,10 +23,7 @@ import org.apache.calcite.sql.type.OperandTypes;
 import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.tools.RelBuilderFactory;
 
-/**
- * PinotMaskColumnRule masks sensitive columns in the query by wrapping them with a maskVal() function.
- * This rule is applied to columns specified in the constructor.
- */
+/** * PinotMaskColumnRule masks sensitive columns in the query by wrapping them with a maskVal() function. * This rule is applied to columns specified in the constructor. */
 public class PinotMaskColumnRule {
 
   public static class Project extends RelOptRule {
@@ -52,9 +32,7 @@ public class PinotMaskColumnRule {
     public static final Project INSTANCE =
         new Project(PinotRuleUtils.PINOT_REL_FACTORY, Set.of("event_json", "rsvp_count"));
 
-    /**
-     * Constructor that takes a set of column names to mask.
-     */
+    /**     * Constructor that takes a set of column names to mask.     */
     public Project(RelBuilderFactory factory, Set<String> columnsToMask) {
       super(operand(LogicalProject.class, any()), factory, null);
       this._columnsToMask = new HashSet<>(columnsToMask);
@@ -109,9 +87,7 @@ public class PinotMaskColumnRule {
     }
   }
 
-  /**
-   * A RexShuttle that recursively checks expressions and applies masking to specified columns.
-   */
+  /**   * A RexShuttle that recursively checks expressions and applies masking to specified columns.   */
   private static class ColumnMaskingShuttle extends RexShuttle {
     private final RexBuilder _rexBuilder;
     private final Set<String> _columnsToMask;
@@ -152,14 +128,14 @@ public class PinotMaskColumnRule {
 
     @Override
     public RexNode visitCall(RexCall call) {
-      // First visit all operands
-      RexCall visitedCall = (RexCall) super.visitCall(call);
-
-      // If this is already a maskVal function, don't wrap it again
-      if (isMaskValFunction(visitedCall)) {
-        _maskedNodes.add(visitedCall);
-        return visitedCall;
+      // First check if this is already a maskVal function before processing operands
+      if (isMaskValFunction(call)) {
+        _maskedNodes.add(call);
+        return call;
       }
+
+      // Visit all operands
+      RexCall visitedCall = (RexCall) super.visitCall(call);
 
       // Check if any operand is in the list to mask directly
       boolean needsMasking = hasColumnToMask(visitedCall);
@@ -173,17 +149,13 @@ public class PinotMaskColumnRule {
       return visitedCall;
     }
 
-    /**
-     * Check if this expression is already a maskVal function call.
-     */
+    /**     * Check if this expression is already a maskVal function call.     */
     private boolean isMaskValFunction(RexCall call) {
       return call.getOperator() instanceof SqlFunction &&
           ((SqlFunction) call.getOperator()).getName().equals("maskVal");
     }
 
-    /**
-     * Check if node has already been masked.
-     */
+    /**     * Check if node has already been masked.     */
     public boolean isAlreadyMasked(RexNode node) {
       if (node instanceof RexCall) {
         return isMaskValFunction((RexCall) node);
@@ -191,10 +163,13 @@ public class PinotMaskColumnRule {
       return _maskedNodes.contains(node);
     }
 
-    /**
-     * Check if the expression contains any column that needs masking.
-     */
+    /**     * Check if the expression contains any column that needs masking.     */
     private boolean hasColumnToMask(RexNode node) {
+      // First check if node is already masked
+      if (_maskedNodes.contains(node)) {
+        return false;
+      }
+
       if (node instanceof RexInputRef) {
         int index = ((RexInputRef) node).getIndex();
         if (index >= 0 && index < _inputFieldNames.size()) {
@@ -206,6 +181,11 @@ public class PinotMaskColumnRule {
         String fieldName = ((RexFieldAccess) node).getField().getName();
         return _columnsToMask.contains(fieldName);
       } else if (node instanceof RexCall) {
+        // Don't check operands if this is a maskVal function
+        if (isMaskValFunction((RexCall) node)) {
+          return false;
+        }
+
         RexCall call = (RexCall) node;
         for (RexNode operand : call.getOperands()) {
           if (hasColumnToMask(operand)) {
@@ -216,9 +196,7 @@ public class PinotMaskColumnRule {
       return false;
     }
 
-    /**
-     * Wrap the expression with maskVal() function.
-     */
+    /**     * Wrap the expression with maskVal() function.     */
     public RexNode wrapWithMaskVal(RexNode node, RelDataType returnType) {
       // Create the maskVal function
       SqlFunction maskValFunction = new SqlFunction("maskVal", SqlKind.OTHER_FUNCTION, ReturnTypes.VARCHAR,
