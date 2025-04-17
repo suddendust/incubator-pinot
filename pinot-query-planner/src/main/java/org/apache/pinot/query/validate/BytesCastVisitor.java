@@ -31,7 +31,6 @@ import org.apache.calcite.sql.type.SqlTypeUtil;
 import org.apache.calcite.sql.util.SqlBasicVisitor;
 import org.apache.calcite.sql.validate.SqlValidator;
 import org.apache.calcite.util.Static;
-import org.apache.pinot.query.planner.plannode.FilterNode;
 
 
 public class BytesCastVisitor extends SqlBasicVisitor<Void> {

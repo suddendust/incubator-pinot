@@ -44,16 +44,11 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelRoot;
 import org.apache.calcite.rex.RexBuilder;
 import org.apache.calcite.runtime.CalciteContextException;
-import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlExplain;
 import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
-import org.apache.calcite.sql.SqlJoin;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
-import org.apache.calcite.sql.SqlSelect;
-import org.apache.calcite.sql.fun.SqlStdOperatorTable;
-import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -80,7 +75,6 @@ import org.apache.pinot.query.planner.logical.RelToPlanNodeConverter;
 import org.apache.pinot.query.planner.logical.TransformationTracker;
 import org.apache.pinot.query.planner.physical.DispatchableSubPlan;
 import org.apache.pinot.query.planner.physical.PinotDispatchPlanner;
-import org.apache.pinot.query.planner.plannode.JoinNode;
 import org.apache.pinot.query.planner.plannode.PlanNode;
 import org.apache.pinot.query.routing.WorkerManager;
 import org.apache.pinot.query.type.TypeFactory;
@@ -309,8 +303,6 @@ public class QueryEnvironment {
   // --------------------------------------------------------------------------
 
   private RelRoot compileQuery(SqlNode sqlNode, PlannerContext plannerContext) {
-    sqlNode.accept(
-        new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
     SqlNode validated = validate(sqlNode, plannerContext);
     RelRoot relation = toRelation(validated, plannerContext);
     RelNode optimized = optimize(relation, plannerContext);
@@ -337,6 +329,8 @@ public class QueryEnvironment {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+      validated.accept(
+          new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
       return validated;
     } catch (QueryException e) {
       throw e;
