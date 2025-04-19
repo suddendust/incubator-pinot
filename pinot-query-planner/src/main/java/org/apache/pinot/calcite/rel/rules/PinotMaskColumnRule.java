@@ -8,6 +8,7 @@
  * License. */
 package org.apache.pinot.calcite.rel.rules;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -24,12 +25,11 @@ import org.apache.calcite.rex.RexInputRef;
 import org.apache.calcite.rex.RexNode;
 import org.apache.calcite.rex.RexShuttle;
 import org.apache.calcite.sql.SqlFunction;
-import org.apache.calcite.sql.SqlFunctionCategory;
-import org.apache.calcite.sql.SqlKind;
-import org.apache.calcite.sql.type.OperandTypes;
-import org.apache.calcite.sql.type.ReturnTypes;
 import org.apache.calcite.sql.type.SqlTypeName;
 import org.apache.calcite.tools.RelBuilderFactory;
+import org.apache.calcite.util.DateString;
+import org.apache.calcite.util.TimeString;
+import org.apache.calcite.util.TimestampString;
 
 
 /** * PinotMaskColumnRule masks sensitive columns in the query by wrapping them with a maskVal() function. * This
@@ -57,39 +57,91 @@ public class PinotMaskColumnRule {
       RelNode input = oldProject.getInput();
       List<String> inputFieldNames = input.getRowType().getFieldNames();
 
-      // First, apply the shuttle to process expressions that include sensitive columns
-      ColumnMaskingShuttle maskingShuttle = new ColumnMaskingShuttle(rexBuilder, _columnsToMask, inputFieldNames);
-      List<RexNode> updatedProjects = new ArrayList<>();
-      for (RexNode node : oldProject.getProjects()) {
-        updatedProjects.add(node.accept(maskingShuttle));
-      }
+      // Create a tracking set to avoid infinite recursion
+      Set<RexNode> processedNodes = new HashSet<>();
 
-      // Then check if any output column names need masking (for aliases)
-      List<RexNode> finalProjects = new ArrayList<>();
+      // Check if any output column needs masking
       List<String> projectNames = oldProject.getRowType().getFieldNames();
-      boolean madeChanges = false;
-
-      for (int i = 0; i < updatedProjects.size(); i++) {
-        RexNode projExpr = updatedProjects.get(i);
-        String projName = projectNames.get(i);
-
-        // If the projection is aliased to a sensitive column name, mask it
-        if (_columnsToMask.contains(projName) && !maskingShuttle.isAlreadyMasked(projExpr)) {
-          finalProjects.add(maskingShuttle.wrapWithMaskVal(projExpr, projExpr.getType()));
-          madeChanges = true;
-        } else {
-          finalProjects.add(projExpr);
-          if (projExpr != oldProject.getProjects().get(i)) {
-            madeChanges = true;
-          }
+      boolean anyColumnToMask = false;
+      for (String name : projectNames) {
+        if (_columnsToMask.contains(name)) {
+          anyColumnToMask = true;
+          break;
         }
       }
 
-      // Only transform if we made changes
+      if (!anyColumnToMask) {
+        return; // No columns to mask, exit early
+      }
+
+      // Process each projection
+      List<RexNode> finalProjects = new ArrayList<>();
+      boolean madeChanges = false;
+
+      for (int i = 0; i < oldProject.getProjects().size(); i++) {
+        RexNode expr = oldProject.getProjects().get(i);
+        String name = projectNames.get(i);
+
+        if (_columnsToMask.contains(name)) {
+          // Get the type of this projection
+          RelDataType dataType = expr.getType();
+
+          // Create an appropriate masked value based on the data type
+          RexNode maskedValue = createMaskedValue(rexBuilder, dataType);
+          finalProjects.add(maskedValue);
+          madeChanges = true;
+        } else {
+          finalProjects.add(expr);
+        }
+      }
+
       if (madeChanges) {
-        LogicalProject newProject =
-            oldProject.copy(oldProject.getTraitSet(), oldProject.getInput(), finalProjects, oldProject.getRowType());
+        // Create a new project with the same row type but masked values
+        LogicalProject newProject = oldProject.copy(oldProject.getTraitSet(), oldProject.getInput(), finalProjects,
+            oldProject.getRowType());  // Keep original row type
+
         call.transformTo(newProject);
+      }
+    }
+
+    /**
+     * Create a masked value that's compatible with the given data type
+     */
+    private RexNode createMaskedValue(RexBuilder rexBuilder, RelDataType dataType) {
+      SqlTypeName typeName = dataType.getSqlTypeName();
+
+      switch (typeName) {
+        case INTEGER:
+        case TINYINT:
+        case SMALLINT:
+          return rexBuilder.makeExactLiteral(BigDecimal.ZERO);
+
+        case BIGINT:
+          return rexBuilder.makeBigintLiteral(BigDecimal.ZERO);
+
+        case FLOAT:
+        case REAL:
+        case DOUBLE:
+        case DECIMAL:
+          return rexBuilder.makeApproxLiteral(BigDecimal.ZERO);
+
+        case BOOLEAN:
+          return rexBuilder.makeLiteral(false);
+
+        case DATE:
+          return rexBuilder.makeDateLiteral(new DateString("1970-01-01"));
+
+        case TIME:
+          return rexBuilder.makeTimeLiteral(new TimeString("00:00:00"), 0);
+
+        case TIMESTAMP:
+          return rexBuilder.makeTimestampLiteral(new TimestampString("1970-01-01 00:00:00"), 0);
+
+        case CHAR:
+        case VARCHAR:
+        default:
+          // For string types or any other type, use "****"
+          return rexBuilder.makeLiteral("****");
       }
     }
   }
@@ -99,22 +151,31 @@ public class PinotMaskColumnRule {
     private final RexBuilder _rexBuilder;
     private final Set<String> _columnsToMask;
     private final List<String> _inputFieldNames;
+    private final Set<RexNode> _processedNodes;
     private final Set<RexNode> _maskedNodes = new HashSet<>();
 
-    ColumnMaskingShuttle(RexBuilder rexBuilder, Set<String> columnsToMask, List<String> inputFieldNames) {
+    ColumnMaskingShuttle(RexBuilder rexBuilder, Set<String> columnsToMask, List<String> inputFieldNames,
+        Set<RexNode> processedNodes) {
       _rexBuilder = rexBuilder;
       _columnsToMask = columnsToMask;
       _inputFieldNames = inputFieldNames;
+      _processedNodes = processedNodes;
     }
 
     @Override
     public RexNode visitInputRef(RexInputRef inputRef) {
-      // Get the column name for this input reference from the input relation's field names
+      // Skip if already processed
+      if (_processedNodes.contains(inputRef)) {
+        return inputRef;
+      }
+      _processedNodes.add(inputRef);
+
+      // Get the column name for this input reference
       int index = inputRef.getIndex();
       if (index >= 0 && index < _inputFieldNames.size()) {
         String columnName = _inputFieldNames.get(index);
         if (_columnsToMask.contains(columnName)) {
-          RexNode maskedNode = wrapWithMaskVal(inputRef, inputRef.getType());
+          RexNode maskedNode = createMaskLiteral();
           _maskedNodes.add(maskedNode);
           return maskedNode;
         }
@@ -124,9 +185,15 @@ public class PinotMaskColumnRule {
 
     @Override
     public RexNode visitFieldAccess(RexFieldAccess fieldAccess) {
+      // Skip if already processed
+      if (_processedNodes.contains(fieldAccess)) {
+        return fieldAccess;
+      }
+      _processedNodes.add(fieldAccess);
+
       String fieldName = fieldAccess.getField().getName();
       if (_columnsToMask.contains(fieldName)) {
-        RexNode maskedNode = wrapWithMaskVal(fieldAccess, fieldAccess.getType());
+        RexNode maskedNode = createMaskLiteral();
         _maskedNodes.add(maskedNode);
         return maskedNode;
       }
@@ -135,7 +202,13 @@ public class PinotMaskColumnRule {
 
     @Override
     public RexNode visitCall(RexCall call) {
-      // First check if this is already a maskVal function before processing operands
+      // Skip if already processed
+      if (_processedNodes.contains(call)) {
+        return call;
+      }
+      _processedNodes.add(call);
+
+      // First check if this is already a maskVal function
       if (isMaskValFunction(call)) {
         _maskedNodes.add(call);
         return call;
@@ -143,78 +216,29 @@ public class PinotMaskColumnRule {
 
       // Visit all operands
       RexCall visitedCall = (RexCall) super.visitCall(call);
-
-      // Check if any operand is in the list to mask directly
-      boolean needsMasking = hasColumnToMask(visitedCall);
-
-      if (needsMasking) {
-        RexNode maskedNode = wrapWithMaskVal(visitedCall, visitedCall.getType());
-        _maskedNodes.add(maskedNode);
-        return maskedNode;
-      }
-
       return visitedCall;
     }
 
-    /**     * Check if this expression is already a maskVal function call.     */
+    /**
+     * Check if this expression is already a maskVal function call.
+     */
     private boolean isMaskValFunction(RexCall call) {
       return call.getOperator() instanceof SqlFunction && ((SqlFunction) call.getOperator()).getName()
           .equals("maskVal");
     }
 
-    /**     * Check if node has already been masked.     */
-    public boolean isAlreadyMasked(RexNode node) {
-      if (node instanceof RexCall) {
-        return isMaskValFunction((RexCall) node);
-      }
-      return _maskedNodes.contains(node);
+    /**
+     * Check if node has already been masked.
+     */
+    public boolean isNodeMasked(RexNode node) {
+      return _maskedNodes.contains(node) || (node instanceof RexCall && isMaskValFunction((RexCall) node));
     }
 
-    /**     * Check if the expression contains any column that needs masking.     */
-    private boolean hasColumnToMask(RexNode node) {
-      // First check if node is already masked
-      if (_maskedNodes.contains(node)) {
-        return false;
-      }
-
-      if (node instanceof RexInputRef) {
-        int index = ((RexInputRef) node).getIndex();
-        if (index >= 0 && index < _inputFieldNames.size()) {
-          String columnName = _inputFieldNames.get(index);
-          return _columnsToMask.contains(columnName);
-        }
-        return false;
-      } else if (node instanceof RexFieldAccess) {
-        String fieldName = ((RexFieldAccess) node).getField().getName();
-        return _columnsToMask.contains(fieldName);
-      } else if (node instanceof RexCall) {
-        // Don't check operands if this is a maskVal function
-        if (isMaskValFunction((RexCall) node)) {
-          return false;
-        }
-
-        RexCall call = (RexCall) node;
-        for (RexNode operand : call.getOperands()) {
-          if (hasColumnToMask(operand)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    /**     * Wrap the expression with maskVal() function.     */
-    public RexNode wrapWithMaskVal(RexNode node, RelDataType returnType) {
-      // Create the maskVal function
-      SqlFunction maskValFunction = new SqlFunction("maskVal", SqlKind.OTHER_FUNCTION, ReturnTypes.VARCHAR,
-          // Return type is same as first argument
-          null, OperandTypes.ANY, // Accept any operand type
-          SqlFunctionCategory.USER_DEFINED_FUNCTION);
-
-      List<RexNode> operands = new ArrayList<>();
-      operands.add(node);
-      return _rexBuilder.makeCall(_rexBuilder.getTypeFactory().createSqlType(SqlTypeName.VARCHAR), maskValFunction,
-          operands);
+    /**
+     * Create a literal mask value "****".
+     */
+    public RexNode createMaskLiteral() {
+      return _rexBuilder.makeLiteral("****");
     }
   }
 }
