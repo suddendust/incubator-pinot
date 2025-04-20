@@ -47,10 +47,10 @@ public interface AuthorizationResult {
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("ActualElapsedTime", "AirTime", "ArrDelay");
+    return Set.of("venue_name", "event_name", "group_id");
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("AirTime");
+    return Set.of("rsvp_count");
   }
 }

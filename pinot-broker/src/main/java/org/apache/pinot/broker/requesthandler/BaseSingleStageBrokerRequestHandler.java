@@ -845,10 +845,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       @Nullable HttpHeaders httpHeaders, AccessControl accessControl) {
     PinotQuery pinotQuery;
     try {
-
-      sqlNodeAndOptions.getSqlNode()
-          .accept(new ColumnMaskingVisitor(Set.of("event_json", "event_time", "group_id", "rsvp_count", "location")));
-
       pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     } catch (Exception e) {
       LOGGER.info("Caught exception while compiling SQL request {}: {}, {}", requestId, query, e.getMessage());
@@ -961,22 +957,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     ModifyFilterClauseVisitor modifyFilterClauseVisitor = new ModifyFilterClauseVisitor(filterNode);
     sqlNodeAndOptions.getSqlNode().accept(modifyFilterClauseVisitor);
 
-    //shuttle pattern: Go and visit the parse tree. ScanNode on a filter node. For SSE: ScanNode, Filter and
-    // aggregation node
-    //1. Create a filter expression in Calcite internal representation.
-    //2. Use visitor patter to get filter + scan node sub-plan (for the original query once it's compiled).
-    //3. Add filter expression to the filter node.
-
-//    PinotQuery pinotQueryWithRowFilters =
-//        CalciteSqlParser.compileToPinotQuery("Select * from " + tableName + " where " + tableRowFilterBuilder);
-//
-//    if (pinotQuery.isSetFilterExpression()) {
-//      pinotQuery.setFilterExpression(RequestUtils.getAndExpression(pinotQuery.getFilterExpression(),
-//          pinotQueryWithRowFilters.getFilterExpression()));
-//    } else {
-//      pinotQuery.setFilterExpression(pinotQueryWithRowFilters.getFilterExpression());
-//    }
-
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -994,6 +974,8 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
     }
+
+    validateQuery(pinotQuery, authorizationResult, _tableCache.getSchema(tableName), false);
 
     //1. Check the project nodes of the original query.
     //2. Check the rex expressions and delete.

@@ -23,12 +23,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.ws.rs.WebApplicationException;
@@ -46,11 +48,16 @@ import org.apache.pinot.broker.routing.BrokerRoutingManager;
 import org.apache.pinot.common.config.provider.TableCache;
 import org.apache.pinot.common.metrics.BrokerMeter;
 import org.apache.pinot.common.metrics.BrokerMetrics;
+import org.apache.pinot.common.request.Expression;
+import org.apache.pinot.common.request.ExpressionType;
+import org.apache.pinot.common.request.Function;
+import org.apache.pinot.common.request.PinotQuery;
 import org.apache.pinot.common.response.BrokerResponse;
 import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListenerFactory;
@@ -218,6 +225,122 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+
+  protected void validateQuery(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema,
+      boolean isSelectStar) {
+    Set<String> visibleColumns = authorizationResult.getVisibleColumns();
+    Set<String> maskedColumns = authorizationResult.getMaskedColumns();
+    if (maskedColumns.isEmpty() && visibleColumns.isEmpty()) {
+      // This implies all columns are visible, no validations needed
+      return;
+    }
+
+    // Get hidden columns
+    Set<String> hiddenCols = schema.getColumnNames().stream()
+        .filter(colName -> !visibleColumns.contains(colName) && !maskedColumns.contains(colName))
+        .collect(Collectors.toSet());
+
+    List<Expression> selectList = pinotQuery.getSelectList();
+
+    // For SELECT * queries, we allow the query to proceed
+    // Hidden columns will be filtered out later
+    if (isSelectStar) {
+      // No validation needed for SELECT * as hidden columns will be handled later
+    } else {
+      // Validate expressions in the SELECT list
+      if (selectList != null) {
+        HashSet<String> colsToValidate = new HashSet<>();
+        colsToValidate.addAll(hiddenCols);
+        colsToValidate.addAll(maskedColumns);
+        for (Expression expression : selectList) {
+          validateExpression(expression, colsToValidate);
+        }
+      }
+    }
+
+    // Validate filter expressions
+    Expression filterExpression = pinotQuery.getFilterExpression();
+    if (filterExpression != null) {
+      // No masked or hidden col should be present in the filter expression
+      HashSet<String> colsToValidate = new HashSet<>();
+      colsToValidate.addAll(hiddenCols);
+      colsToValidate.addAll(maskedColumns);
+      validateExpression(filterExpression, colsToValidate);
+    }
+
+    // Validate GROUP BY expressions
+    List<Expression> groupByList = pinotQuery.getGroupByList();
+    if (groupByList != null) {
+      HashSet<String> colsToValidate = new HashSet<>();
+      colsToValidate.addAll(hiddenCols);
+      colsToValidate.addAll(maskedColumns);
+      for (Expression expression : groupByList) {
+        validateExpression(expression, colsToValidate);
+      }
+    }
+
+    // Validate ORDER BY expressions
+    List<Expression> orderByList = pinotQuery.getOrderByList();
+    if (orderByList != null) {
+      HashSet<String> colsToValidate = new HashSet<>();
+      colsToValidate.addAll(hiddenCols);
+      colsToValidate.addAll(maskedColumns);
+      for (Expression expression : orderByList) {
+        validateExpression(expression, colsToValidate);
+      }
+    }
+
+    // Validate HAVING expression
+    Expression havingExpression = pinotQuery.getHavingExpression();
+    if (havingExpression != null) {
+      HashSet<String> colsToValidate = new HashSet<>();
+      colsToValidate.addAll(hiddenCols);
+      colsToValidate.addAll(maskedColumns);
+      validateExpression(havingExpression, colsToValidate);
+    }
+  }
+
+  /**
+   * Recursively validates an expression to ensure it doesn't access hidden or masked cols columns
+   */
+  private void validateExpression(Expression expression, Set<String> colsToValidate) {
+    if (expression == null) {
+      return;
+    }
+
+    // Check identifier expressions for hidden columns
+    if (expression.getType() == ExpressionType.IDENTIFIER) {
+      String columnName = expression.getIdentifier().getName();
+      if (colsToValidate.contains(columnName)) {
+        throw new RuntimeException("Unauthorized access to column: " + columnName);
+      }
+      return;
+    }
+
+    // For function expressions, validate each of the operands
+    if (expression.getType() == ExpressionType.FUNCTION) {
+      Function function = expression.getFunctionCall();
+      List<Expression> operands = function.getOperands();
+      if (operands != null) {
+        for (Expression operand : operands) {
+          validateExpression(operand, colsToValidate);
+        }
+      }
+      return;
+    }
+
+    // For literal expressions, no validation needed
+    if (expression.getType() == ExpressionType.LITERAL) {
+      return;
+    }
+
+    // Handle other expression types (e.g., binary operations)
+    if (expression.getFunctionCall() != null && expression.getFunctionCall().getOperands() != null) {
+      for (Expression operand : expression.getFunctionCall().getOperands()) {
+        validateExpression(operand, colsToValidate);
+      }
+    }
+  }
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
