@@ -977,6 +977,10 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     validateQuery(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
 
+    sqlNodeAndOptions.getSqlNode().accept(new ColumnMaskingVisitor(Set.of("rsvp_count")));
+    pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+    serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+
     //1. Check the project nodes of the original query.
     //2. Check the rex expressions and delete.
 

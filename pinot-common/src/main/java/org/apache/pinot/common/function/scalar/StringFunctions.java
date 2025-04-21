@@ -54,12 +54,6 @@ public class StringFunctions {
     return "****";
   }
 
-  @ScalarFunction
-  public static int maskVal(int input) {
-    return 0;
-  }
-
-
 
   @ScalarFunction
   public static String addInputPrefix(int input) {

@@ -236,7 +236,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param schema the table schema
    */
   protected void validateQuery(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema) {
-      Set<String> visibleColumns = authorizationResult.getVisibleColumns();
+    Set<String> visibleColumns = authorizationResult.getVisibleColumns();
     Set<String> maskedColumns = authorizationResult.getMaskedColumns();
     if (maskedColumns.isEmpty() && visibleColumns.isEmpty()) {
       // This implies all columns are visible, no validations needed
@@ -259,7 +259,6 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
         validateExpression(expression, hiddenCols);
       }
     }
-
 
     // Validate filter expressions
     Expression filterExpression = pinotQuery.getFilterExpression();
