@@ -55,8 +55,8 @@ public class StringFunctions {
   }
 
   @ScalarFunction
-  public static String maskVal(String input) {
-    return "****";
+  public static int maskVal(int input) {
+    return 0;
   }
 
 

@@ -226,9 +226,17 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
       HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
 
-  protected void validateQuery(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema,
-      boolean isSelectStar) {
-    Set<String> visibleColumns = authorizationResult.getVisibleColumns();
+  /**
+   * Validates the query for the following:
+   * <p> 1. No aggregates/functions/UDFs allowed on any hidden columns. </p>
+   * <p> 2. No filters allowed on any hidden columns. </p>
+   * <p> 3. No group by / order by / HAVING on any hidden col </p>
+   * @param pinotQuery the fully expanded Pinot query (containing all column names)
+   * @param authorizationResult the RBAC response
+   * @param schema the table schema
+   */
+  protected void validateQuery(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema) {
+      Set<String> visibleColumns = authorizationResult.getVisibleColumns();
     Set<String> maskedColumns = authorizationResult.getMaskedColumns();
     if (maskedColumns.isEmpty() && visibleColumns.isEmpty()) {
       // This implies all columns are visible, no validations needed
@@ -244,59 +252,42 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     // For SELECT * queries, we allow the query to proceed
     // Hidden columns will be filtered out later
-    if (isSelectStar) {
-      // No validation needed for SELECT * as hidden columns will be handled later
-    } else {
-      // Validate expressions in the SELECT list
-      if (selectList != null) {
-        HashSet<String> colsToValidate = new HashSet<>();
-        colsToValidate.addAll(hiddenCols);
-        colsToValidate.addAll(maskedColumns);
-        for (Expression expression : selectList) {
-          validateExpression(expression, colsToValidate);
-        }
+
+    // Validate expressions in the SELECT list
+    if (selectList != null) {
+      for (Expression expression : selectList) {
+        validateExpression(expression, hiddenCols);
       }
     }
+
 
     // Validate filter expressions
     Expression filterExpression = pinotQuery.getFilterExpression();
     if (filterExpression != null) {
       // No masked or hidden col should be present in the filter expression
-      HashSet<String> colsToValidate = new HashSet<>();
-      colsToValidate.addAll(hiddenCols);
-      colsToValidate.addAll(maskedColumns);
-      validateExpression(filterExpression, colsToValidate);
+      validateExpression(filterExpression, hiddenCols);
     }
 
     // Validate GROUP BY expressions
     List<Expression> groupByList = pinotQuery.getGroupByList();
     if (groupByList != null) {
-      HashSet<String> colsToValidate = new HashSet<>();
-      colsToValidate.addAll(hiddenCols);
-      colsToValidate.addAll(maskedColumns);
       for (Expression expression : groupByList) {
-        validateExpression(expression, colsToValidate);
+        validateExpression(expression, hiddenCols);
       }
     }
 
     // Validate ORDER BY expressions
     List<Expression> orderByList = pinotQuery.getOrderByList();
     if (orderByList != null) {
-      HashSet<String> colsToValidate = new HashSet<>();
-      colsToValidate.addAll(hiddenCols);
-      colsToValidate.addAll(maskedColumns);
       for (Expression expression : orderByList) {
-        validateExpression(expression, colsToValidate);
+        validateExpression(expression, hiddenCols);
       }
     }
 
     // Validate HAVING expression
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
-      HashSet<String> colsToValidate = new HashSet<>();
-      colsToValidate.addAll(hiddenCols);
-      colsToValidate.addAll(maskedColumns);
-      validateExpression(havingExpression, colsToValidate);
+      validateExpression(havingExpression, hiddenCols);
     }
   }
 
