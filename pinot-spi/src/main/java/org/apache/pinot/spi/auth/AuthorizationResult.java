@@ -43,11 +43,11 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("ArrDelay < '0'");
+    return Set.of("group_lat > 0", "group_lon < 0");
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("venue_name", "event_name", "group_id");
+    return Set.of("venue_name", "event_name", "group_id", "group_lat", "group_lon", "mtime");
   }
 
   default Set<String> getMaskedColumns() {

@@ -935,27 +935,24 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Parse the original SQL using CalciteSqlParser
 
-//    // Parse filter expressions and create a combined filter
-//    SqlNode filterNode = null;
-//    for (String filterExpr : authorizationResult.getRowFilters()) {
-//      // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
-//      String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
-//      SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
-//      SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
-//
-//      // Extract the WHERE clause from the parsed query
-//      SqlSelect select = (SqlSelect) parsedQuery;
-//      SqlNode parsedFilter = select.getWhere();
-//
-//      if (filterNode == null) {
-//        filterNode = parsedFilter;
-//      } else {
-//        filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
-//      }
-//    }
-//
-//    ModifyFilterClauseVisitor modifyFilterClauseVisitor = new ModifyFilterClauseVisitor(filterNode);
-//    sqlNodeAndOptions.getSqlNode().accept(modifyFilterClauseVisitor);
+    // Parse filter expressions and create a combined filter
+    SqlNode filterNode = null;
+    for (String filterExpr : authorizationResult.getRowFilters()) {
+      // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
+      String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
+      SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
+      SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
+
+      // Extract the WHERE clause from the parsed query
+      SqlSelect select = (SqlSelect) parsedQuery;
+      SqlNode parsedFilter = select.getWhere();
+
+      if (filterNode == null) {
+        filterNode = parsedFilter;
+      } else {
+        filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
+      }
+    }
 
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
@@ -977,6 +974,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     validateQuery(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
 
+    sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
     sqlNodeAndOptions.getSqlNode().accept(new ColumnMaskingVisitor(Set.of("rsvp_count")));
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
