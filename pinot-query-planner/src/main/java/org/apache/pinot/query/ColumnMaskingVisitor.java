@@ -19,7 +19,9 @@
 package org.apache.pinot.query;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.calcite.sql.SqlBasicCall;
 import org.apache.calcite.sql.SqlCall;
@@ -32,26 +34,75 @@ import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.fun.SqlStdOperatorTable;
 import org.apache.calcite.sql.util.SqlShuttle;
 
+
 /**
  * A visitor that applies masking to specified columns in a SQL query.
- * It wraps specified columns in the SELECT list with a mask() function.
+ * It wraps specified columns in the SELECT list with a type-specific mask function.
+ * Works in conjunction with MaskingFunction class which provides the actual mask implementations.
  */
 public class ColumnMaskingVisitor extends SqlShuttle {
   // Set of column names that should be masked
   private final Set<String> _maskedColumns;
 
-  // Operator for the mask function
-  private final SqlMaskFunction _maskOperator;
+  // Map of column names to their data types
+  private final Map<String, String> _columnDataTypes;
+
+  // Map of data types to their respective mask functions
+  private final Map<String, SqlMaskFunction> _maskFunctionsByType;
 
   /**
-   * Constructor with the set of columns to mask.
+   * Constructor with the set of columns to mask and their data types.
    *
    * @param maskedColumns Set of column names to be masked
+   * @param columnDataTypes Map of column names to their data types
    */
-  public ColumnMaskingVisitor(Set<String> maskedColumns) {
+  public ColumnMaskingVisitor(Set<String> maskedColumns, Map<String, String> columnDataTypes) {
     _maskedColumns = maskedColumns;
-    // Create a custom operator for the mask function
-    _maskOperator = new SqlMaskFunction();
+    _columnDataTypes = columnDataTypes;
+    _maskFunctionsByType = initMaskFunctions();
+  }
+
+  /**
+   * Initialize the map of data types to their corresponding mask functions.
+   * Each mask function corresponds to a method in the MaskingFunction class.
+   *
+   * @return Map of data types to SqlMaskFunction objects
+   */
+  private Map<String, SqlMaskFunction> initMaskFunctions() {
+    Map<String, SqlMaskFunction> maskFunctions = new HashMap<>();
+
+    // Numeric types
+    maskFunctions.put("INT", new SqlMaskFunction("maskInt"));
+    maskFunctions.put("LONG", new SqlMaskFunction("maskLong"));
+    maskFunctions.put("FLOAT", new SqlMaskFunction("maskFloat"));
+    maskFunctions.put("DOUBLE", new SqlMaskFunction("maskDouble"));
+
+    // String types
+    maskFunctions.put("STRING", new SqlMaskFunction("maskStr"));
+
+    // Boolean type
+    maskFunctions.put("BOOLEAN", new SqlMaskFunction("maskBoolean"));
+
+    // Timestamp types
+    maskFunctions.put("TIMESTAMP", new SqlMaskFunction("maskTimestamp"));
+
+    // Bytes type
+    maskFunctions.put("BYTES", new SqlMaskFunction("maskBytes"));
+
+    // JSON types
+    maskFunctions.put("JSON", new SqlMaskFunction("maskJson"));
+
+    // Array types
+    maskFunctions.put("INT_ARRAY", new SqlMaskFunction("maskIntArray"));
+    maskFunctions.put("LONG_ARRAY", new SqlMaskFunction("maskLongArray"));
+    maskFunctions.put("FLOAT_ARRAY", new SqlMaskFunction("maskFloatArray"));
+    maskFunctions.put("DOUBLE_ARRAY", new SqlMaskFunction("maskDoubleArray"));
+    maskFunctions.put("STRING_ARRAY", new SqlMaskFunction("maskStringArray"));
+
+    // Default mask function for unknown types
+    maskFunctions.put("DEFAULT", new SqlMaskFunction("maskVal"));
+
+    return maskFunctions;
   }
 
   @Override
@@ -74,8 +125,8 @@ public class ColumnMaskingVisitor extends SqlShuttle {
    */
   private SqlNodeList processSelectList(SqlNodeList selectList) {
     // If it's SELECT *, we can't easily transform it
-    if (selectList.size() == 1 && selectList.get(0) instanceof SqlIdentifier
-        && ((SqlIdentifier) selectList.get(0)).isStar()) {
+    if (selectList.size() == 1 && selectList.get(0) instanceof SqlIdentifier && ((SqlIdentifier) selectList.get(
+        0)).isStar()) {
       return selectList;
     }
 
@@ -116,10 +167,7 @@ public class ColumnMaskingVisitor extends SqlShuttle {
 
         // If the expression was modified, create a new AS call
         if (maskedExpr != expr) {
-          return SqlStdOperatorTable.AS.createCall(
-              call.getParserPosition(),
-              maskedExpr,
-              alias);
+          return SqlStdOperatorTable.AS.createCall(call.getParserPosition(), maskedExpr, alias);
         }
       } else {
         // For any other function call, check if it uses masked columns
@@ -135,8 +183,8 @@ public class ColumnMaskingVisitor extends SqlShuttle {
   }
 
   /**
-   * Find any masked column references in an expression and replace them with mask() calls.
-   * If a function or expression uses a masked column, replace the entire expression with mask(column).
+   * Find any masked column references in an expression and replace them with appropriate mask() calls.
+   * If a function or expression uses a masked column, replace the entire expression with the appropriate mask function.
    *
    * @param node The SQL node to check
    * @return The node with masking applied if needed
@@ -162,25 +210,27 @@ public class ColumnMaskingVisitor extends SqlShuttle {
 
       // Check all operands for masked columns
       List<SqlNode> operands = call.getOperandList();
-      List<SqlIdentifier> maskedColumnsFound = new ArrayList<>();
+      List<MaskedColumnInfo> maskedColumnsFound = new ArrayList<>();
 
       // Collect any masked column identifiers in the operands
       for (SqlNode operand : operands) {
         collectMaskedColumns(operand, maskedColumnsFound);
       }
 
-      // If we found masked columns, replace the entire expression with mask calls
+      // If we found masked columns, replace the entire expression with appropriate mask calls
       if (!maskedColumnsFound.isEmpty()) {
         // For simplicity, we'll mask each column individually
         // For more complex expressions, you might want a different strategy
         if (maskedColumnsFound.size() == 1) {
-          // If only one masked column, replace with mask(column)
-          return _maskOperator.createCall(call.getParserPosition(), maskedColumnsFound.get(0));
+          // If only one masked column, replace with the appropriate type-specific mask function
+          MaskedColumnInfo info = maskedColumnsFound.get(0);
+          return info.maskFunction.createCall(call.getParserPosition(), info.identifier);
         } else {
           // If multiple masked columns, this gets more complex
           // For now, just mask the first one found as a simplification
           // You might want to adjust this strategy based on your needs
-          return _maskOperator.createCall(call.getParserPosition(), maskedColumnsFound.get(0));
+          MaskedColumnInfo info = maskedColumnsFound.get(0);
+          return info.maskFunction.createCall(call.getParserPosition(), info.identifier);
         }
       }
     }
@@ -190,20 +240,34 @@ public class ColumnMaskingVisitor extends SqlShuttle {
   }
 
   /**
-   * Recursively collect all masked column identifiers in a node.
+   * Helper class to store masked column information.
+   */
+  private class MaskedColumnInfo {
+    SqlIdentifier identifier;
+    SqlMaskFunction maskFunction;
+
+    MaskedColumnInfo(SqlIdentifier identifier, SqlMaskFunction maskFunction) {
+      this.identifier = identifier;
+      this.maskFunction = maskFunction;
+    }
+  }
+
+  /**
+   * Recursively collect all masked column identifiers in a node along with their mask functions.
    *
    * @param node The node to check
-   * @param maskedColumns List to collect the masked columns into
+   * @param maskedColumns List to collect the masked column information into
    */
-  private void collectMaskedColumns(SqlNode node, List<SqlIdentifier> maskedColumns) {
+  private void collectMaskedColumns(SqlNode node, List<MaskedColumnInfo> maskedColumns) {
     if (node == null) {
       return;
     }
 
     if (node instanceof SqlIdentifier) {
       SqlIdentifier id = (SqlIdentifier) node;
-      if (shouldMaskIdentifier(id)) {
-        maskedColumns.add(id);
+      SqlMaskFunction maskFunction = getMaskFunctionForIdentifier(id);
+      if (maskFunction != null) {
+        maskedColumns.add(new MaskedColumnInfo(id, maskFunction));
       }
     } else if (node instanceof SqlCall) {
       SqlCall call = (SqlCall) node;
@@ -211,6 +275,27 @@ public class ColumnMaskingVisitor extends SqlShuttle {
         collectMaskedColumns(operand, maskedColumns);
       }
     }
+  }
+
+  /**
+   * Get the appropriate mask function for an identifier, or null if it shouldn't be masked.
+   *
+   * @param id The identifier to check
+   * @return The appropriate SqlMaskFunction or null
+   */
+  private SqlMaskFunction getMaskFunctionForIdentifier(SqlIdentifier id) {
+    if (!shouldMaskIdentifier(id)) {
+      return null;
+    }
+
+    // Get the column name (last part of the identifier)
+    String columnName = id.names.get(id.names.size() - 1);
+
+    // Get the data type for this column
+    String dataType = _columnDataTypes.getOrDefault(columnName, "DEFAULT");
+
+    // Return the appropriate mask function for this data type
+    return _maskFunctionsByType.getOrDefault(dataType, _maskFunctionsByType.get("DEFAULT"));
   }
 
   /**
@@ -238,9 +323,10 @@ public class ColumnMaskingVisitor extends SqlShuttle {
    * @return The masked or original identifier
    */
   private SqlNode maskIdentifierIfNeeded(SqlIdentifier id) {
-    if (shouldMaskIdentifier(id)) {
-      // Create a mask() function call with the identifier as its argument
-      return _maskOperator.createCall(id.getParserPosition(), id);
+    SqlMaskFunction maskFunction = getMaskFunctionForIdentifier(id);
+    if (maskFunction != null) {
+      // Create the appropriate mask function call with the identifier as its argument
+      return maskFunction.createCall(id.getParserPosition(), id);
     }
 
     // Column not in masked set, return as is
@@ -248,12 +334,11 @@ public class ColumnMaskingVisitor extends SqlShuttle {
   }
 
   /**
-   * Custom SqlOperator for the mask function.
+   * Custom SqlOperator for mask functions that correspond to MaskingFunction methods.
    */
   private static class SqlMaskFunction extends org.apache.calcite.sql.SqlFunction {
-    public SqlMaskFunction() {
-      super(
-          "maskVal",                      // Function name
+    public SqlMaskFunction(String name) {
+      super(name,                        // Function name
           SqlKind.OTHER_FUNCTION,      // SQL kind
           null,                        // Return type inference
           null,                        // Operand type inference

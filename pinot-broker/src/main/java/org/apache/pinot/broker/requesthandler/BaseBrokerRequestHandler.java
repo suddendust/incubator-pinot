@@ -22,10 +22,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,6 +59,7 @@ import org.apache.pinot.common.response.broker.BrokerResponseNative;
 import org.apache.pinot.common.response.broker.QueryProcessingException;
 import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.eventlistener.query.BrokerQueryEventListener;
@@ -287,6 +290,107 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
     Expression havingExpression = pinotQuery.getHavingExpression();
     if (havingExpression != null) {
       validateExpression(havingExpression, hiddenCols);
+    }
+  }
+
+  protected void validateAuthResponse(Schema schema, AuthorizationResult authorizationResult) {
+    Set<String> rowFilters = authorizationResult.getRowFilters();
+    NavigableSet<String> columnNames = schema.getColumnNames();
+    for (String rowFilter : rowFilters) {
+      String[] split = rowFilter.split(" ");
+      if (split.length < 3) {
+        throw new RuntimeException("Invalid row filter format: " + rowFilter);
+      }
+
+      String colName = split[0];
+      String operator = split[1];
+      String operand = split[2];
+
+      FieldSpec colFieldSpec = schema.getFieldSpecFor(colName);
+      if (colFieldSpec == null) {
+        throw new RuntimeException("Column " + colName + " not present in schema");
+      }
+
+      // Validate that column exists in the schema
+      if (!columnNames.contains(colName)) {
+        throw new RuntimeException("Column " + colName + " not found in column names");
+      }
+
+      // Validate operand matches the column data type
+      FieldSpec.DataType dataType = colFieldSpec.getDataType();
+      try {
+        switch (dataType) {
+          case INT:
+            int i = Integer.parseInt(operand);
+            break;
+          case LONG:
+            long l = Long.parseLong(operand);
+            break;
+          case FLOAT:
+            float f = Float.parseFloat(operand);
+            break;
+          case DOUBLE:
+            double d = Double.parseDouble(operand);
+            break;
+          case BOOLEAN:
+            if (!operand.equalsIgnoreCase("true") && !operand.equalsIgnoreCase("false")) {
+              throw new RuntimeException("Invalid boolean value: " + operand);
+            }
+            break;
+          case STRING:
+            // No validation needed for strings
+            break;
+          case TIMESTAMP:
+            // Assuming timestamp is in milliseconds since epoch
+            long timestamp = Long.parseLong(operand);
+            break;
+          case BYTES:
+            // Assuming bytes are encoded as base64
+            try {
+              Base64.getDecoder().decode(operand);
+            } catch (IllegalArgumentException e) {
+              throw new RuntimeException("Invalid base64 encoded bytes: " + operand);
+            }
+            break;
+          default:
+            throw new RuntimeException("Unsupported data type: " + dataType);
+        }
+
+        // Validate that operator is valid for this data type
+        validateOperator(operator, dataType);
+      } catch (NumberFormatException e) {
+        throw new RuntimeException("Invalid operand " + operand + " for data type " + dataType);
+      }
+    }
+  }
+
+  private void validateOperator(String operator, FieldSpec.DataType dataType) {
+    // Define valid operators for each data type
+    Set<String> validOperators;
+
+    switch (dataType) {
+      case INT:
+      case LONG:
+      case FLOAT:
+      case DOUBLE:
+      case TIMESTAMP:
+        validOperators = Set.of("=", "!=", "<", "<=", ">", ">=");
+        break;
+      case STRING:
+        validOperators = Set.of("=", "!=", "LIKE", "NOT_LIKE", "CONTAINS", "STARTS_WITH", "ENDS_WITH");
+        break;
+      case BOOLEAN:
+        validOperators = Set.of("=", "!=");
+        break;
+      case BYTES:
+        validOperators = Set.of("=", "!=");
+        break;
+      default:
+        validOperators = Collections.emptySet();
+    }
+
+    if (!validOperators.contains(operator)) {
+      throw new RuntimeException("Invalid operator " + operator + " for data type " + dataType);
     }
   }
 

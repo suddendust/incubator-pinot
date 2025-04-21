@@ -24,10 +24,13 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -101,6 +104,7 @@ import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
+import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -972,10 +976,19 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
+    Collection<FieldSpec> allFieldSpecs = _tableCache.getSchema(tableName).getAllFieldSpecs();
+
     validateQuery(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
 
+    Map<String, String> colNameToTypeMap = new HashMap<>();
+    Set<String> colNames = _tableCache.getSchema(tableName).getColumnNames();
+    for (String colName : colNames) {
+      colNameToTypeMap.put(colName, _tableCache.getSchema(tableName).getFieldSpecFor(colName).getDataType().toString());
+    }
+
     sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
-    sqlNodeAndOptions.getSqlNode().accept(new ColumnMaskingVisitor(Set.of("rsvp_count")));
+    sqlNodeAndOptions.getSqlNode()
+        .accept(new ColumnMaskingVisitor(authorizationResult.getMaskedColumns(), colNameToTypeMap));
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
 
