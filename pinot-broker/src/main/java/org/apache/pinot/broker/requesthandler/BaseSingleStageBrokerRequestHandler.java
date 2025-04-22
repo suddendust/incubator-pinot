@@ -974,7 +974,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     boolean isValidationSuccessful = filterNode.accept(new FilterExpressionValidator(colNameToTypeMap));
 
     if (!isValidationSuccessful) {
-      throw new RuntimeException("RBAC policy failure, please contact the admins to understand the error");
+      throw new RuntimeException("RBAC policy validation failure, please contact the admins to understand the error");
     }
 
     try {
