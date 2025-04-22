@@ -43,14 +43,14 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("group_lat > 'helloworld'", "group_lon < 0");
+    return Set.of();
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("event_name", "group_id", "group_lat", "group_lon", "mtime");
+    return Set.of();
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("rsvp_count", "venue_name");
+    return Set.of();
   }
 }

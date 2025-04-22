@@ -954,27 +954,30 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Parse filter expressions and create a combined filter
     SqlNode filterNode = null;
-    for (String filterExpr : authorizationResult.getRowFilters()) {
-      // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
-      String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
-      SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
-      SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
+    if (!authorizationResult.getRowFilters().isEmpty()) {
+      for (String filterExpr : authorizationResult.getRowFilters()) {
+        // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
+        String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
+        SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
+        SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
 
-      // Extract the WHERE clause from the parsed query
-      SqlSelect select = (SqlSelect) parsedQuery;
-      SqlNode parsedFilter = select.getWhere();
+        // Extract the WHERE clause from the parsed query
+        SqlSelect select = (SqlSelect) parsedQuery;
+        SqlNode parsedFilter = select.getWhere();
 
-      if (filterNode == null) {
-        filterNode = parsedFilter;
-      } else {
-        filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
+        if (filterNode == null) {
+          filterNode = parsedFilter;
+        } else {
+          filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
+        }
       }
-    }
 
-    boolean isValidationSuccessful = filterNode.accept(new FilterExpressionValidator(colNameToTypeMap));
+      boolean isValidationSuccessful = filterNode.accept(new FilterExpressionValidator(colNameToTypeMap));
 
-    if (!isValidationSuccessful) {
-      throw new RuntimeException("RBAC policy validation failure, please contact the admins to understand the error");
+      if (!isValidationSuccessful) {
+        throw new RuntimeException("RBAC policy validation failure, please contact the admins to understand the error");
+      }
+
     }
 
     try {
