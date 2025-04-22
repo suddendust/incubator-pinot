@@ -998,7 +998,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
-    sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
+    if (!authorizationResult.getRowFilters().isEmpty()) {
+      sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
+    }
     sqlNodeAndOptions.getSqlNode()
         .accept(new ColumnMaskingVisitor(authorizationResult.getMaskedColumns(), colNameToTypeMap));
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);

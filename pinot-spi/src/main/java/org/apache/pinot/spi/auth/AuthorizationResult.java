@@ -43,14 +43,15 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of();
+    return Set.of("DestState = 'CA'", "Distance > 2000");
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of();
+    return Set.of("ActualElapsedTime", "AirTime", "AirlineID", "ArrDel15", "ArrDelay", "ArrDelayMinutes", "DestState",
+        "Distance");
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of();
+    return Set.of("LateAircraftDelay", "FlightDate");
   }
 }
