@@ -43,7 +43,7 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("group_lat > 0", "group_lon < 0");
+    return Set.of("group_lat > 'helloworld'", "group_lon < 0");
   }
 
   default Set<String> getVisibleColumns() {

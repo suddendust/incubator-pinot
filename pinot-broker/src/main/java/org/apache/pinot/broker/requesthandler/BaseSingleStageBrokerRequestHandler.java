@@ -93,6 +93,7 @@ import org.apache.pinot.core.routing.TimeBoundaryInfo;
 import org.apache.pinot.core.transport.ServerInstance;
 import org.apache.pinot.core.util.GapfillUtils;
 import org.apache.pinot.query.ColumnMaskingVisitor;
+import org.apache.pinot.query.FilterExpressionValidator;
 import org.apache.pinot.query.parser.utils.ParserUtils;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
@@ -943,6 +944,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
     }
 
+    Map<String, String> colNameToTypeMap = new HashMap<>();
+    Set<String> colNames = _tableCache.getSchema(tableName).getColumnNames();
+    for (String colName : colNames) {
+      colNameToTypeMap.put(colName, _tableCache.getSchema(tableName).getFieldSpecFor(colName).getDataType().toString());
+    }
+
     // Parse the original SQL using CalciteSqlParser
 
     // Parse filter expressions and create a combined filter
@@ -964,6 +971,12 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
     }
 
+    boolean isValidationSuccessful = filterNode.accept(new FilterExpressionValidator(colNameToTypeMap));
+
+    if (!isValidationSuccessful) {
+      throw new RuntimeException("RBAC policy failure, please contact the admins to understand the error");
+    }
+
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
       if (columnNameMap != null) {
@@ -980,12 +993,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
       }
       LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
           e.getMessage());
-    }
-
-    Map<String, String> colNameToTypeMap = new HashMap<>();
-    Set<String> colNames = _tableCache.getSchema(tableName).getColumnNames();
-    for (String colName : colNames) {
-      colNameToTypeMap.put(colName, _tableCache.getSchema(tableName).getFieldSpecFor(colName).getDataType().toString());
     }
 
     sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
