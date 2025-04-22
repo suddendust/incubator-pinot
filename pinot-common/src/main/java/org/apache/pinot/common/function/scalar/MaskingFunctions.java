@@ -74,23 +74,7 @@ public class MaskingFunctions {
    */
   @ScalarFunction
   public static String maskStr(String value) {
-    if (value == null) {
-      return null;
-    }
-
-    int length = value.length();
-    if (length <= 4) {
-      return "****";
-    }
-
-    StringBuilder masked = new StringBuilder();
-    masked.append(value.charAt(0));
-    for (int i = 1; i < length - 1; i++) {
-      masked.append('*');
-    }
-    masked.append(value.charAt(length - 1));
-
-    return masked.toString();
+    return "****";
   }
 
   /**

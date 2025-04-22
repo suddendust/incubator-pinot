@@ -77,6 +77,7 @@ public enum BrokerMeter implements AbstractMetrics.Meter {
   RESOURCE_MISSING_EXCEPTIONS("exceptions", true),
   // Query validation phase.
   QUERY_VALIDATION_EXCEPTIONS("exceptions", false),
+  RBAC_VALIATION_EXCEPTIONS("exceptions", false),
   // Query validation phase.
   UNKNOWN_COLUMN_EXCEPTIONS("exceptions", false),
   // Queries preempted by accountant

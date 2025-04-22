@@ -47,10 +47,10 @@ public interface AuthorizationResult {
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("venue_name", "event_name", "group_id", "group_lat", "group_lon", "mtime");
+    return Set.of("event_name", "group_id", "group_lat", "group_lon", "mtime");
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("rsvp_count");
+    return Set.of("rsvp_count", "venue_name");
   }
 }

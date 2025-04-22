@@ -24,13 +24,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NavigableSet;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletionService;
@@ -104,7 +102,6 @@ import org.apache.pinot.spi.config.table.RoutingConfig;
 import org.apache.pinot.spi.config.table.TableConfig;
 import org.apache.pinot.spi.config.table.TableType;
 import org.apache.pinot.spi.data.DimensionFieldSpec;
-import org.apache.pinot.spi.data.FieldSpec;
 import org.apache.pinot.spi.data.Schema;
 import org.apache.pinot.spi.env.PinotConfiguration;
 import org.apache.pinot.spi.exception.BadQueryRequestException;
@@ -397,6 +394,15 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (!authorizationResult.hasAccess()) {
       throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
+    }
+
+    try {
+      validateQueryForRBAC(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
+    } catch (Exception e) {
+      LOGGER.info("Caught exception while validating RBAC for request {}: {}, {}", requestId, query, e.getMessage());
+      requestContext.setErrorCode(QueryErrorCode.RBAC_VALIDATION);
+      _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.RBAC_VALIATION_EXCEPTIONS, 1);
+      return new BrokerResponseNative(QueryErrorCode.RBAC_VALIDATION, e.getMessage());
     }
 
     // Get the tables hit by the request
@@ -976,10 +982,6 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
-    Collection<FieldSpec> allFieldSpecs = _tableCache.getSchema(tableName).getAllFieldSpecs();
-
-    validateQuery(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
-
     Map<String, String> colNameToTypeMap = new HashMap<>();
     Set<String> colNames = _tableCache.getSchema(tableName).getColumnNames();
     for (String colName : colNames) {
@@ -991,6 +993,24 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
         .accept(new ColumnMaskingVisitor(authorizationResult.getMaskedColumns(), colNameToTypeMap));
     pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
     serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+
+    try {
+      Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);
+      if (columnNameMap != null) {
+        updateColumnNames(rawTableName, serverPinotQuery, ignoreCase, columnNameMap);
+      }
+    } catch (Exception e) {
+      // Throw exceptions with column in-existence error.
+      if (e instanceof BadQueryRequestException) {
+        LOGGER.info("Caught exception while checking column names in request {}: {}, {}", requestId, query,
+            e.getMessage());
+        requestContext.setErrorCode(QueryErrorCode.UNKNOWN_COLUMN);
+        _brokerMetrics.addMeteredTableValue(rawTableName, BrokerMeter.UNKNOWN_COLUMN_EXCEPTIONS, 1);
+        return new CompileResult(new BrokerResponseNative(QueryErrorCode.UNKNOWN_COLUMN, e.getMessage()));
+      }
+      LOGGER.warn("Caught exception while updating column names in request {}: {}, {}", requestId, query,
+          e.getMessage());
+    }
 
     //1. Check the project nodes of the original query.
     //2. Check the rex expressions and delete.

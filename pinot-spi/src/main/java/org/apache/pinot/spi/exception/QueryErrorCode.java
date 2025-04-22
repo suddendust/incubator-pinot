@@ -52,6 +52,7 @@ public enum QueryErrorCode {
   QUERY_CANCELLATION(503, "QueryCancellationError"),
   /// Error detected at validation time. For example, type mismatch.
   QUERY_VALIDATION(700, "QueryValidationError"),
+  RBAC_VALIDATION(701, "RBACValidationError"),
   UNKNOWN_COLUMN(710, "UnknownColumnError"),
   ///  Error while planning the query. For example, trying to run a colocated join on non-colocated tables.
   QUERY_PLANNING(720, "QueryPlanningError"),

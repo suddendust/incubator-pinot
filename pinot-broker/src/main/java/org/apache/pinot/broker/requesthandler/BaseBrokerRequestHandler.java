@@ -24,7 +24,6 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
@@ -238,7 +237,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @param authorizationResult the RBAC response
    * @param schema the table schema
    */
-  protected void validateQuery(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema) {
+  protected void validateQueryForRBAC(PinotQuery pinotQuery, AuthorizationResult authorizationResult, Schema schema) {
     Set<String> visibleColumns = authorizationResult.getVisibleColumns();
     Set<String> maskedColumns = authorizationResult.getMaskedColumns();
     if (maskedColumns.isEmpty() && visibleColumns.isEmpty()) {
