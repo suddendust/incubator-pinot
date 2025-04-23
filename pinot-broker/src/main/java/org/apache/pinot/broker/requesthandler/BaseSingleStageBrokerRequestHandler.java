@@ -398,7 +398,9 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     }
 
     try {
-      validateQueryForRBAC(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
+      if (!pinotQuery.isExplain()) {
+        validateQueryForRBAC(pinotQuery, authorizationResult, _tableCache.getSchema(tableName));
+      }
     } catch (Exception e) {
       LOGGER.info("Caught exception while validating RBAC for request {}: {}, {}", requestId, query, e.getMessage());
       requestContext.setErrorCode(QueryErrorCode.RBAC_VALIDATION);
@@ -954,7 +956,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     // Parse filter expressions and create a combined filter
     SqlNode filterNode = null;
-    if (!authorizationResult.getRowFilters().isEmpty()) {
+    if (!authorizationResult.getRowFilters().isEmpty() && !pinotQuery.isExplain()) {
       for (String filterExpr : authorizationResult.getRowFilters()) {
         // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
         String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
@@ -998,13 +1000,16 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
           e.getMessage());
     }
 
-    if (!authorizationResult.getRowFilters().isEmpty()) {
+    if (!authorizationResult.getRowFilters().isEmpty() && !pinotQuery.isExplain()) {
       sqlNodeAndOptions.getSqlNode().accept(new ModifyFilterClauseVisitor(filterNode));
     }
-    sqlNodeAndOptions.getSqlNode()
-        .accept(new ColumnMaskingVisitor(authorizationResult.getMaskedColumns(), colNameToTypeMap));
-    pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
-    serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+
+    if (!pinotQuery.isExplain()) {
+      sqlNodeAndOptions.getSqlNode()
+          .accept(new ColumnMaskingVisitor(authorizationResult.getMaskedColumns(), colNameToTypeMap));
+      pinotQuery = CalciteSqlParser.compileToPinotQuery(sqlNodeAndOptions);
+      serverPinotQuery = GapfillUtils.stripGapfill(pinotQuery);
+    }
 
     try {
       Map<String, String> columnNameMap = _tableCache.getColumnNameMap(rawTableName);

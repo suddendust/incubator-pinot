@@ -49,6 +49,9 @@ import org.apache.calcite.sql.SqlExplainFormat;
 import org.apache.calcite.sql.SqlExplainLevel;
 import org.apache.calcite.sql.SqlKind;
 import org.apache.calcite.sql.SqlNode;
+import org.apache.calcite.sql.SqlSelect;
+import org.apache.calcite.sql.fun.SqlStdOperatorTable;
+import org.apache.calcite.sql.parser.SqlParserPos;
 import org.apache.calcite.sql2rel.RelDecorrelator;
 import org.apache.calcite.sql2rel.SqlToRelConverter;
 import org.apache.calcite.tools.FrameworkConfig;
@@ -329,6 +332,25 @@ public class QueryEnvironment {
         throw new IllegalArgumentException("Unsupported SQL query, failed to validate query:\n" + sqlNode);
       }
       validated.accept(new BytesCastVisitor(plannerContext.getValidator()));
+
+      SqlNode filterNode = null;
+      for (String filterExpr : Set.of("DestState = 'CA'", "Distance > 2000")) {
+        // For each filter like "region='EMEA'", we need to wrap it in a SELECT to parse it
+        String dummyQuery = "SELECT * FROM dummy WHERE " + filterExpr;
+        SqlNodeAndOptions filterNodeAndOptions = CalciteSqlParser.compileToSqlNodeAndOptions(dummyQuery);
+        SqlNode parsedQuery = filterNodeAndOptions.getSqlNode();
+
+        // Extract the WHERE clause from the parsed query
+        SqlSelect select = (SqlSelect) parsedQuery;
+        SqlNode parsedFilter = select.getWhere();
+
+        if (filterNode == null) {
+          filterNode = parsedFilter;
+        } else {
+          filterNode = SqlStdOperatorTable.AND.createCall(SqlParserPos.ZERO, filterNode, parsedFilter);
+        }
+      }
+      validated.accept(new ModifyFilterClauseVisitor(filterNode));
       return validated;
     } catch (QueryException e) {
       throw e;

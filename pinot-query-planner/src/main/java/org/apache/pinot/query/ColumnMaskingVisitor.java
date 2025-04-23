@@ -199,7 +199,7 @@ public class ColumnMaskingVisitor extends SqlShuttle {
       return maskIdentifierIfNeeded((SqlIdentifier) node);
     }
 
-    // For calls (functions, operators), check if they contain masked columns
+    // For calls (functions, operators), recursively process their operands
     if (node instanceof SqlCall) {
       SqlCall call = (SqlCall) node;
 
@@ -208,30 +208,26 @@ public class ColumnMaskingVisitor extends SqlShuttle {
         return call;
       }
 
-      // Check all operands for masked columns
-      List<SqlNode> operands = call.getOperandList();
-      List<MaskedColumnInfo> maskedColumnsFound = new ArrayList<>();
+      // Check if we need to modify any operands
+      boolean operandsModified = false;
+      List<SqlNode> newOperands = new ArrayList<>();
 
-      // Collect any masked column identifiers in the operands
-      for (SqlNode operand : operands) {
-        collectMaskedColumns(operand, maskedColumnsFound);
+      for (SqlNode operand : call.getOperandList()) {
+        // Recursively process each operand
+        SqlNode newOperand = findAndMaskColumns(operand);
+        newOperands.add(newOperand);
+
+        if (newOperand != operand) {
+          operandsModified = true;
+        }
       }
 
-      // If we found masked columns, replace the entire expression with appropriate mask calls
-      if (!maskedColumnsFound.isEmpty()) {
-        // For simplicity, we'll mask each column individually
-        // For more complex expressions, you might want a different strategy
-        if (maskedColumnsFound.size() == 1) {
-          // If only one masked column, replace with the appropriate type-specific mask function
-          MaskedColumnInfo info = maskedColumnsFound.get(0);
-          return info.maskFunction.createCall(call.getParserPosition(), info.identifier);
-        } else {
-          // If multiple masked columns, this gets more complex
-          // For now, just mask the first one found as a simplification
-          // You might want to adjust this strategy based on your needs
-          MaskedColumnInfo info = maskedColumnsFound.get(0);
-          return info.maskFunction.createCall(call.getParserPosition(), info.identifier);
-        }
+      // If any operands were modified, create a new call with the modified operands
+      if (operandsModified) {
+        return call.getOperator().createCall(
+            call.getParserPosition(),
+            newOperands.toArray(new SqlNode[0])
+        );
       }
     }
 
