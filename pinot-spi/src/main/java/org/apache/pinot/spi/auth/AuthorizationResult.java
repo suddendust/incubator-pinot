@@ -43,15 +43,14 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("DestState = 'CA'", "Distance > 2000");
+    return Set.of("rsvp_id > 10L");
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("ActualElapsedTime", "AirTime", "AirlineID", "ArrDel15", "ArrDelay", "ArrDelayMinutes", "DestState",
-        "Distance");
+    return Set.of("event_json", "group_json", "member_json");
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("LateAircraftDelay", "FlightDate");
+    return Set.of("venue_json");
   }
 }
