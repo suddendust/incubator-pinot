@@ -304,7 +304,7 @@ public class FilterExpressionValidator extends SqlBasicVisitor<Boolean> {
     return typeName.equalsIgnoreCase("TINYINT") || typeName.equalsIgnoreCase("SMALLINT") || typeName.equalsIgnoreCase(
         "INTEGER") || typeName.equalsIgnoreCase("INT") || typeName.equalsIgnoreCase("BIGINT")
         || typeName.equalsIgnoreCase("DECIMAL") || typeName.equalsIgnoreCase("FLOAT") || typeName.equalsIgnoreCase(
-        "REAL") || typeName.equalsIgnoreCase("DOUBLE");
+        "REAL") || typeName.equalsIgnoreCase("DOUBLE") || typeName.equalsIgnoreCase("LONG");
   }
 
   /**

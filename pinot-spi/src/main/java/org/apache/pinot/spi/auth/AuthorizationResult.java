@@ -43,14 +43,14 @@ public interface AuthorizationResult {
   String getFailureMessage();
 
   default Set<String> getRowFilters() {
-    return Set.of("rsvp_id > 10L");
+    return Set.of("venue_json IS NOT NUL");
   }
 
   default Set<String> getVisibleColumns() {
-    return Set.of("event_json", "group_json", "member_json");
+    return Set.of("venue_json", "group_json", "member_json", "rsvp_id");
   }
 
   default Set<String> getMaskedColumns() {
-    return Set.of("venue_json");
+    return Set.of("event_json");
   }
 }
