@@ -54,6 +54,7 @@ import org.apache.pinot.common.utils.request.RequestUtils;
 import org.apache.pinot.core.auth.Actions;
 import org.apache.pinot.core.auth.TargetType;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -221,26 +222,15 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
   /**
    * Validates whether the requester has access to all the tables.
    */
-  protected TableAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity, Set<String> tableNames,
-      RequestContext requestContext, HttpHeaders httpHeaders) {
+  protected MultipleTablesAuthorizationResult hasTableAccess(RequesterIdentity requesterIdentity,
+      Set<String> tableNames, RequestContext requestContext, HttpHeaders httpHeaders) {
     final long startTimeNs = System.nanoTime();
     AccessControl accessControl = _accessControlFactory.create();
 
-    TableAuthorizationResult tableAuthorizationResult = accessControl.authorize(requesterIdentity, tableNames);
+    MultipleTablesAuthorizationResult multipleTableAuthorizationResult =
+        accessControl.authorize(requesterIdentity, tableNames);
 
-    Set<String> failedTables = tableNames.stream()
-        .filter(table -> !accessControl.hasAccess(httpHeaders, TargetType.TABLE, table, Actions.Table.QUERY))
-        .collect(Collectors.toSet());
-
-    failedTables.addAll(tableAuthorizationResult.getFailedTables());
-
-    if (!failedTables.isEmpty()) {
-      tableAuthorizationResult = new TableAuthorizationResult(failedTables);
-    } else {
-      tableAuthorizationResult = TableAuthorizationResult.success();
-    }
-
-    if (!tableAuthorizationResult.hasAccess()) {
+    if (!multipleTableAuthorizationResult.hasAccess()) {
       _brokerMetrics.addMeteredGlobalValue(BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
       LOGGER.warn("Access denied for requestId {}", requestContext.getRequestId());
       requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
@@ -248,7 +238,7 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.AUTHORIZATION, System.nanoTime() - startTimeNs);
 
-    return tableAuthorizationResult;
+    return multipleTableAuthorizationResult;
   }
 
   /**
@@ -285,7 +275,8 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
    * @return true if the query was successfully cancelled, false otherwise.
    */
   protected abstract boolean handleCancel(long queryId, int timeoutMs, Executor executor,
-      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses) throws Exception;
+      HttpClientConnectionManager connMgr, Map<String, Integer> serverResponses)
+      throws Exception;
 
   protected static void augmentStatistics(RequestContext statistics, BrokerResponse response) {
     statistics.setNumRowsResultSet(response.getNumRowsResultSet());
@@ -366,16 +357,14 @@ public abstract class BaseBrokerRequestHandler implements BrokerRequestHandler {
 
   @Override
   public OptionalLong getRequestIdByClientId(String clientQueryId) {
-    return _clientQueryIds.entrySet().stream()
-        .filter(e -> clientQueryId.equals(e.getValue()))
-        .mapToLong(Map.Entry::getKey)
-        .findFirst();
+    return _clientQueryIds.entrySet().stream().filter(e -> clientQueryId.equals(e.getValue()))
+        .mapToLong(Map.Entry::getKey).findFirst();
   }
 
   @Nullable
   protected String extractClientRequestId(SqlNodeAndOptions sqlNodeAndOptions) {
-    return sqlNodeAndOptions.getOptions() != null
-        ? sqlNodeAndOptions.getOptions().get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
+    return sqlNodeAndOptions.getOptions() != null ? sqlNodeAndOptions.getOptions()
+        .get(Broker.Request.QueryOptionKey.CLIENT_QUERY_ID) : null;
   }
 
   protected void onQueryStart(long requestId, String clientRequestId, String query, Object... extras) {

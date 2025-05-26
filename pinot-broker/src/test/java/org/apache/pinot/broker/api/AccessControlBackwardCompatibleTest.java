@@ -21,6 +21,8 @@ package org.apache.pinot.broker.api;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.testng.annotations.Test;
 
@@ -43,9 +45,10 @@ public class AccessControlBackwardCompatibleTest {
     AccessControl accessControl = new AllFalseAccessControlImpl();
     HttpRequesterIdentity identity = new HttpRequesterIdentity();
     Set<String> tables = Set.of("table1", "table2");
-    AuthorizationResult result = accessControl.authorize(identity, tables);
-    assertFalse(result.hasAccess());
-    assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
+    MultipleTablesAuthorizationResult multipleTablesAuthorizationResult = accessControl.authorize(identity, tables);
+    assertFalse(multipleTablesAuthorizationResult.hasAccess());
+    assertEquals(multipleTablesAuthorizationResult.getFailureMessage(),
+        "Authorization Failed for tables: [table1, table2]");
   }
 
   @Test(expectedExceptions = UnsupportedOperationException.class)
@@ -90,6 +93,11 @@ public class AccessControlBackwardCompatibleTest {
     @Override
     public boolean hasAccess(RequesterIdentity requesterIdentity, Set<String> tables) {
       return false;
+    }
+
+    @Override
+    public AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, String table) {
+      return new BasicAuthorizationResultImpl(false);
     }
   }
 

@@ -18,6 +18,8 @@
  */
 package org.apache.pinot.broker.api;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.pinot.common.request.BrokerRequest;
@@ -26,7 +28,8 @@ import org.apache.pinot.spi.annotations.InterfaceAudience;
 import org.apache.pinot.spi.annotations.InterfaceStability;
 import org.apache.pinot.spi.auth.AuthorizationResult;
 import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
-import org.apache.pinot.spi.auth.TableAuthorizationResult;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 
 
@@ -105,9 +108,16 @@ public interface AccessControl extends FineGrainedAccessControl {
             + "implementations.");
   }
 
+  @Deprecated
+  default AuthorizationResult hasAccess(RequesterIdentity requesterIdentity, String table) {
+    throw new UnsupportedOperationException(
+        "Both hasAccess() and authorize() are not implemented . Do implement authorize() method for new "
+            + "implementations.");
+  }
+
   /**
    * Verify access control on pinot tables.
-   * The default implementation returns a {@link TableAuthorizationResult} with the result of the hasAccess() of the
+   * The default implementation returns a {@link MultipleTablesAuthorizationResult} with the result of the hasAccess() of the
    * implementation
    *
    * @param requesterIdentity requester identity
@@ -115,10 +125,19 @@ public interface AccessControl extends FineGrainedAccessControl {
    *
    * @return {@code TableAuthorizationResult} with the result of the access control check
    */
-  default TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+  default MultipleTablesAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
     // Taking all tables when hasAccess Failed , to not break existing implementations
     // It will say all tables names failed AuthZ even only some failed AuthZ - which is same as just boolean output
-    return hasAccess(requesterIdentity, tables) ? TableAuthorizationResult.success()
-        : new TableAuthorizationResult(tables, Map.of());
+
+    Map<String, AuthorizationResult> tableAuthResults = new HashMap<>();
+    Map<String, List<String>> rlsFilters = new HashMap<>();
+
+    for (String table : tables) {
+      AuthorizationResult authorizationResult = hasAccess(requesterIdentity, table);
+      tableAuthResults.put(table, authorizationResult);
+      rlsFilters.put(table, authorizationResult.getRLSFilters());
+    }
+
+    return new MultipleTablesAuthorizationResultImpl(tableAuthResults, rlsFilters);
   }
 }

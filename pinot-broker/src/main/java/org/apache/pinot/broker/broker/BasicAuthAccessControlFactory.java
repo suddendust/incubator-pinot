@@ -35,6 +35,9 @@ import org.apache.pinot.common.request.BrokerRequest;
 import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.BasicAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResultImpl;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -110,13 +113,13 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(brokerRequest.getQuerySource().getTableName());
-      rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(brokerRequest.getQuerySource().getTableName(), strings));
+      rlsFiltersMaybe.ifPresent(rlsFilters -> tableRLSFilters.put(brokerRequest.getQuerySource().getTableName(), rlsFilters));
 
-      return new TableAuthorizationResult(failedTables, tableRLSFilters);
+      return new TableAuthorizationResult(failedTables);
     }
 
     @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+    public MultipleTablesAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
       Optional<BasicAuthPrincipal> principalOpt = getPrincipalOpt(requesterIdentity);
 
       if (!principalOpt.isPresent()) {
@@ -124,20 +127,20 @@ public class BasicAuthAccessControlFactory extends AccessControlFactory {
       }
 
       if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.success();
+        return MultipleTablesAuthorizationResultImpl.SUCCESS;
       }
       BasicAuthPrincipal principal = principalOpt.get();
-      Set<String> failedTables = new HashSet<>();
       Map<String, List<String>> tableRLSFilters = new HashMap<>();
+      Map<String, AuthorizationResult> authResults = new HashMap<>();
       for (String table : tables) {
-        if (!principal.hasTable(table)) {
-          failedTables.add(table);
-        }
+        boolean hasAccess = principal.hasTable(table);
+        AuthorizationResult authorizationResult = new BasicAuthorizationResultImpl(hasAccess);
+        authResults.put(table, authorizationResult);
         //check if RLS filters have been defined for this table
         Optional<List<String>> rlsFiltersMaybe = principal.getRLSFilters(table);
         rlsFiltersMaybe.ifPresent(strings -> tableRLSFilters.put(table, strings));
       }
-      return new TableAuthorizationResult(failedTables, tableRLSFilters);
+      return new MultipleTablesAuthorizationResultImpl(authResults, tableRLSFilters);
     }
 
     private Optional<BasicAuthPrincipal> getPrincipalOpt(RequesterIdentity requesterIdentity) {

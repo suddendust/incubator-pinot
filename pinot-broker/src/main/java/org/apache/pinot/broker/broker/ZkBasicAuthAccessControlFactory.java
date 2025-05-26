@@ -39,6 +39,7 @@ import org.apache.pinot.core.auth.BasicAuthPrincipal;
 import org.apache.pinot.core.auth.BasicAuthUtils;
 import org.apache.pinot.core.auth.ZkBasicAuthPrincipal;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -97,30 +98,31 @@ public class ZkBasicAuthAccessControlFactory extends AccessControlFactory {
         return TableAuthorizationResult.success();
       }
 
-      return authorize(requesterIdentity, Collections.singleton(brokerRequest.getQuerySource().getTableName()));
+      return null;
     }
 
     @Override
-    public TableAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
-      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
-      if (!principalOpt.isPresent()) {
-        throw new NotAuthorizedException("Basic");
-      }
-      if (tables == null || tables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-
-      ZkBasicAuthPrincipal principal = principalOpt.get();
-      Set<String> failedTables = new HashSet<>();
-      for (String table : tables) {
-        if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
-          failedTables.add(table);
-        }
-      }
-      if (failedTables.isEmpty()) {
-        return TableAuthorizationResult.success();
-      }
-      return new TableAuthorizationResult(failedTables, Map.of());
+    public MultipleTablesAuthorizationResult authorize(RequesterIdentity requesterIdentity, Set<String> tables) {
+//      Optional<ZkBasicAuthPrincipal> principalOpt = getPrincipalAuth(requesterIdentity);
+//      if (!principalOpt.isPresent()) {
+//        throw new NotAuthorizedException("Basic");
+//      }
+//      if (tables == null || tables.isEmpty()) {
+//        return TableAuthorizationResult.success();
+//      }
+//
+//      ZkBasicAuthPrincipal principal = principalOpt.get();
+//      Set<String> failedTables = new HashSet<>();
+//      for (String table : tables) {
+//        if (!principal.hasTable(TableNameBuilder.extractRawTableName(table))) {
+//          failedTables.add(table);
+//        }
+//      }
+//      if (failedTables.isEmpty()) {
+//        return TableAuthorizationResult.success();
+//      }
+//      return new TableAuthorizationResult(failedTables);
+      return null;
     }
 
     private Optional<ZkBasicAuthPrincipal> getPrincipalAuth(RequesterIdentity requesterIdentity) {

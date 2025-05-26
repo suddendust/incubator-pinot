@@ -52,7 +52,7 @@ public interface AuthorizationResult {
    *
    * @return A map where each key is a policy ID and the corresponding value is a list of row filter expressions.
    */
-  default Map<String, List<String>> getRLSFilters() {
-    return Map.of("policyId1", List.of("ArrDelay < 50", "ActualElapsedTime < 100"));
+  default List<String> getRLSFilters() {
+    return List.of("ArrDelay < 50", "ActualElapsedTime < 100");
   }
 }

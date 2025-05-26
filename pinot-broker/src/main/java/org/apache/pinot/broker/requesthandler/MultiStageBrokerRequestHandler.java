@@ -81,6 +81,7 @@ import org.apache.pinot.query.runtime.MultiStageStatsTreeBuilder;
 import org.apache.pinot.query.runtime.plan.MultiStageQueryStats;
 import org.apache.pinot.query.service.dispatch.QueryDispatcher;
 import org.apache.pinot.spi.accounting.ThreadExecutionContext;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.TableAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.env.PinotConfiguration;
@@ -302,7 +303,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
       HttpHeaders httpHeaders, QueryEnvironment.CompiledQuery compiledQuery) {
     Set<String> tables = compiledQuery.getTableNames();
     if (tables != null && !tables.isEmpty()) {
-      TableAuthorizationResult tableAuthorizationResult =
+      MultipleTablesAuthorizationResult tableAuthorizationResult =
           hasTableAccess(requesterIdentity, tables, requestContext, httpHeaders);
       if (!tableAuthorizationResult.hasAccess()) {
         throwTableAccessError(tableAuthorizationResult);
@@ -396,7 +397,7 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
     updatePhaseTimingForTables(tableNames, BrokerQueryPhase.REQUEST_COMPILATION, compilationTimeNs);
 
     // Validate table access.
-    TableAuthorizationResult tableAuthorizationResult =
+    MultipleTablesAuthorizationResult tableAuthorizationResult =
         hasTableAccess(requesterIdentity, tableNames, requestContext, httpHeaders);
     if (!tableAuthorizationResult.hasAccess()) {
       throwTableAccessError(tableAuthorizationResult);
@@ -526,6 +527,14 @@ public class MultiStageBrokerRequestHandler extends BaseBrokerRequestHandler {
   }
 
   private static void throwTableAccessError(TableAuthorizationResult tableAuthorizationResult) {
+    String failureMessage = tableAuthorizationResult.getFailureMessage();
+    if (StringUtils.isNotBlank(failureMessage)) {
+      failureMessage = "Reason: " + failureMessage;
+    }
+    throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+  }
+
+  private static void throwTableAccessError(MultipleTablesAuthorizationResult tableAuthorizationResult) {
     String failureMessage = tableAuthorizationResult.getFailureMessage();
     if (StringUtils.isNotBlank(failureMessage)) {
       failureMessage = "Reason: " + failureMessage;

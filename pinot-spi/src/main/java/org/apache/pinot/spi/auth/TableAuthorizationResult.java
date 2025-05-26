@@ -33,14 +33,11 @@ import org.apache.commons.lang3.StringUtils;
  * at the table level, including which tables failed authorization.
  */
 public class TableAuthorizationResult implements AuthorizationResult {
-
-  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of(), Map.of());
+  private static final TableAuthorizationResult SUCCESS = new TableAuthorizationResult(Set.of());
   private final Set<String> _failedTables;
-  private final Map<String, List<String>> _tableRLSFilters;
 
-  public TableAuthorizationResult(Set<String> failedTables, Map<String, List<String>> tableRLSFilters) {
+  public TableAuthorizationResult(Set<String> failedTables) {
     _failedTables = failedTables;
-    _tableRLSFilters = tableRLSFilters;
   }
 
   /**
@@ -75,9 +72,5 @@ public class TableAuthorizationResult implements AuthorizationResult {
     List<String> failedTablesList = new ArrayList<>(_failedTables);
     Collections.sort(failedTablesList); // Sort to make output deterministic
     return "Authorization Failed for tables: " + failedTablesList;
-  }
-
-  public Optional<List<String>> getRLSFiltersForTable(String tableName) {
-    return Optional.ofNullable(_tableRLSFilters.get(tableName));
   }
 }

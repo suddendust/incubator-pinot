@@ -98,6 +98,7 @@ import org.apache.pinot.query.routing.table.LogicalTableRouteProvider;
 import org.apache.pinot.query.routing.table.TableRouteProvider;
 import org.apache.pinot.segment.local.function.GroovyFunctionEvaluator;
 import org.apache.pinot.spi.auth.AuthorizationResult;
+import org.apache.pinot.spi.auth.MultipleTablesAuthorizationResult;
 import org.apache.pinot.spi.auth.broker.RequesterIdentity;
 import org.apache.pinot.spi.config.table.FieldConfig;
 import org.apache.pinot.spi.config.table.QueryConfig;
@@ -402,7 +403,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
     if (logicalTableConfig != null) {
       Set<String> physicalTableNames = logicalTableConfig.getPhysicalTableConfigMap().keySet();
-      AuthorizationResult authorizationResult =
+      MultipleTablesAuthorizationResult authorizationResult =
           hasTableAccess(requesterIdentity, physicalTableNames, requestContext, httpHeaders);
       if (!authorizationResult.hasAccess()) {
         throwAccessDeniedError(requestId, query, requestContext, tableName, authorizationResult);
@@ -899,8 +900,7 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
     //rewrite query
     Map<String, String> queryOptions =
         pinotQuery.getQueryOptions() == null ? new HashMap<>() : pinotQuery.getQueryOptions();
-    List<String> rowFilters =
-        authorizationResult.getRLSFilters().values().stream().flatMap(Collection::stream).collect(Collectors.toList());
+    List<String> rowFilters = authorizationResult.getRLSFilters();
     StringBuilder sb = new StringBuilder();
     for (int i = 0; i < rowFilters.size(); i++) {
       sb.append(rowFilters.get(i));
@@ -959,6 +959,20 @@ public abstract class BaseSingleStageBrokerRequestHandler extends BaseBrokerRequ
 
   private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
       AuthorizationResult authorizationResult) {
+    _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
+    LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
+        authorizationResult.getFailureMessage());
+
+    requestContext.setErrorCode(QueryErrorCode.ACCESS_DENIED);
+    String failureMessage = authorizationResult.getFailureMessage();
+    if (StringUtils.isNotBlank(failureMessage)) {
+      failureMessage = "Reason: " + failureMessage;
+    }
+    throw new WebApplicationException("Permission denied." + failureMessage, Response.Status.FORBIDDEN);
+  }
+
+  private void throwAccessDeniedError(long requestId, String query, RequestContext requestContext, String tableName,
+      MultipleTablesAuthorizationResult authorizationResult) {
     _brokerMetrics.addMeteredTableValue(tableName, BrokerMeter.REQUEST_DROPPED_DUE_TO_ACCESS_ERROR, 1);
     LOGGER.info("Access denied for request {}: {}, table: {}, reason :{}", requestId, query, tableName,
         authorizationResult.getFailureMessage());

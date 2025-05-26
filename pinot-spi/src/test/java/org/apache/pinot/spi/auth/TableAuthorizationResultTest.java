@@ -32,14 +32,14 @@ public class TableAuthorizationResultTest {
   public void testParameterizedConstructor() {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables, Map.of());
+    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertTrue(result.getFailureMessage().contains("table1"));
   }
 
   @Test
   public void testAddFailedTable() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"), Map.of());
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1"));
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1]");
   }
@@ -49,14 +49,14 @@ public class TableAuthorizationResultTest {
     Set<String> failedTables = new HashSet<>();
     failedTables.add("table1");
     failedTables.add("table2");
-    TableAuthorizationResult result = new TableAuthorizationResult(failedTables, Map.of());
+    TableAuthorizationResult result = new TableAuthorizationResult(failedTables);
     Assert.assertFalse(result.hasAccess());
     Assert.assertEquals(result.getFailedTables(), failedTables);
   }
 
   @Test
   public void testGetFailureMessage() {
-    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"), Map.of());
+    TableAuthorizationResult result = new TableAuthorizationResult(Set.of("table1", "table2"));
     Assert.assertEquals(result.getFailureMessage(), "Authorization Failed for tables: [table1, table2]");
   }
 
